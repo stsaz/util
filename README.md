@@ -23,24 +23,23 @@ Feel free to use them if you want, everything here is absolutely free.
 
 Network:
 
-	net/dns-client.h+ffdns-client.c - DNS client.
+	net/dns-client.h - DNS client
 	net/dns.h - DNS constants and message read/write functions
-	net/http-client.h+ffhttp-client.c - HTTP client
+	net/dpdk.h - Intel DPDK wrapper
+	net/http-client.h - HTTP client
 	net/http1-status.h - HTTP status codes and messages
 	net/http1.h - Read/write HTTP/1 data
 	net/ipaddr.h - IPv4 address
 	net/socks.h - SOCKS4
-	net/tls.h+fftls.c - TLS reader.
+	net/tls.h - TLS reader
 	net/url.h
-	net/websocket.h+ffwebskt.c - WebSocket reader/writer.
+	net/websocket.h - WebSocket reader/writer
 
 DB:
 
 	db/db.h
-	db/ffdb-postgre.c
-	db/ffdb-sqlite.c
-	db/postgre.h - PostgreSQL libpq wrapper.
-	db/sqlite.h
+	db/postgre.h - PostgreSQL libpq wrapper
+	db/sqlite.h - SQLite wrapper
 
 GUI:
 
@@ -48,6 +47,7 @@ GUI:
 	gui-gtk/ffgui-gtk.c
 	gui-gtk/gtk.h - GUI based on GTK+.
 	gui-gtk/loader.h - GUI based on GTK+
+	gui-gtk/unix-shell.h - UNIX shell utils
 	gui-vars.h - GUI variables
 	gui-winapi/ffgui-winapi-loader.c
 	gui-winapi/ffgui-winapi.c
