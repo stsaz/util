@@ -80,7 +80,7 @@ FF_EXTERN void ffui_ldr_fin(ffui_loader *g);
 /** Load GUI from file. */
 FF_EXTERN int ffui_ldr_loadfile(ffui_loader *g, const char *fn);
 
-FF_EXTERN void ffui_ldr_loadconf(ffui_loader *g, const char *fn);
+FF_EXTERN void ffui_ldr_loadconf(ffui_loader *g, const char *fn, ffuint64 file_max_size);
 
 
 typedef struct ffui_ldr_ctl ffui_ldr_ctl;
@@ -91,12 +91,12 @@ struct ffui_ldr_ctl {
 };
 
 #define FFUI_LDR_CTL(struct_name, ctl) \
-	{ #ctl, FFOFF(struct_name, ctl), NULL }
+	{ #ctl, (ffuint)FF_OFF(struct_name, ctl), NULL }
 
 #define FFUI_LDR_CTL3(struct_name, ctl, children) \
-	{ #ctl, FFOFF(struct_name, ctl), children }
+	{ #ctl, (ffuint)FF_OFF(struct_name, ctl), children }
 #define FFUI_LDR_CTL3_PTR(struct_name, ctl, children) \
-	{ #ctl, 0x80000000 | FFOFF(struct_name, ctl), children }
+	{ #ctl, 0x80000000 | (ffuint)FF_OFF(struct_name, ctl), children }
 
 #define FFUI_LDR_CTL_END  {NULL, 0, NULL}
 

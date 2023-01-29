@@ -17,7 +17,7 @@ void test_ltconf()
 	ffmem_zero_obj(&c);
 
 	ffstr_setz(&in,
-"  key  val1  \"val w space\" \"val w\\\" quote\" \"\\\\val w\\x01 binary\" \"val\n\
+"  key  val1 val2 \"val w space\" \"val w\\\" quote\" \"\\\\val w\\x01 binary\" \"val\n\
 w\n\
 newline\" val4 \"\"  # comment \n\
   key1  val1\n");
@@ -28,6 +28,8 @@ newline\" val4 \"\"  # comment \n\
 
 	xieq(LTCONF_VAL, ltconf_read(&c, &in, &out));
 	xseq(&out, "val1");
+	xieq(LTCONF_VAL_NEXT, ltconf_read(&c, &in, &out));
+	xseq(&out, "val2");
 
 	xieq(LTCONF_VAL_NEXT, ltconf_read(&c, &in, &out));
 	xseq(&out, "val w space");

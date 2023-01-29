@@ -1658,7 +1658,7 @@ int ffui_ldr_loadfile(ffui_loader *g, const char *fn)
 	g->path.len += FFS_LEN("/");
 
 	ffstr errstr = {};
-	int r = ffconf_parse_file(top_args, g, fn, 0, &errstr);
+	int r = ffconf_parse_file(top_args, g, fn, 0, &errstr, 1*1024*1024);
 	if (r != 0) {
 		ffmem_free(g->errstr);
 		g->errstr = ffsz_dupstr(&errstr);
@@ -1763,12 +1763,12 @@ int ffui_ldr_write(ffui_loaderw *ldr, const char *fn)
 	return fffile_writewhole(fn, buf.ptr, buf.len, 0);
 }
 
-void ffui_ldr_loadconf(ffui_loader *g, const char *fn)
+void ffui_ldr_loadconf(ffui_loader *g, const char *fn, ffuint64 file_max_size)
 {
 	ffvec buf = {};
 	ffstr s, line, name, val;
 
-	if (0 != fffile_readwhole(fn, &buf, 64*1024*1024))
+	if (0 != fffile_readwhole(fn, &buf, file_max_size))
 		goto done;
 	ffstr_setstr(&s, &buf);
 
@@ -1797,10 +1797,10 @@ void ffui_ldr_loadconf(ffui_loader *g, const char *fn)
 
 		g->ctl = g->getctl(g->udata, &name);
 		if (g->ctl != NULL) {
-			ffconf conf = {};
-			ffconf_init(&conf);
+			ffltconf conf = {};
+			ffltconf_init(&conf);
 			ffconf_scheme cs = {};
-			cs.parser = &conf;
+			cs.parser = &conf.ff;
 			state_reset(g);
 
 			switch (g->ctl->uid) {
@@ -1835,7 +1835,7 @@ void ffui_ldr_loadconf(ffui_loader *g, const char *fn)
 
 			ffbool lf = 0;
 			for (;;) {
-				int r = ffconf_parse(&conf, &val);
+				int r = ffltconf_parse(&conf, &val);
 				if (r < 0)
 					goto done;
 				else if (r == FFCONF_RMORE && !lf) {
@@ -1852,7 +1852,7 @@ void ffui_ldr_loadconf(ffui_loader *g, const char *fn)
 			}
 
 			ffconf_scheme_destroy(&cs);
-			ffconf_fin(&conf);
+			ffltconf_fin(&conf);
 		}
 	}
 

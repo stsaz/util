@@ -60,6 +60,7 @@ enum LTCONF_FLAGS {
 	LTCONF_FKEY = 1,
 	LTCONF_FVAL = 2,
 	LTCONF_FQUOTED = 4,
+	LTCONF_FCHUNKED = 8,
 };
 
 enum LTCONF_OPT {
@@ -170,7 +171,7 @@ static inline int ltconf_read(struct ltconf *c, ffstr *in, ffstr *out)
 				ffstr_set(out, d, end - d);
 				d = end;
 				goto chunk;
-			} else if (r == 0) {
+			} else if (r == 0 && !(c->flags & LTCONF_FCHUNKED)) {
 				c->error = "non-printable character or a quote";
 				goto err;
 			}
@@ -277,11 +278,13 @@ skip:
 chunk:
 	c->line_off = d - line_start;
 	ffstr_set(in, d, end - d);
+	c->flags |= LTCONF_FCHUNKED;
 	return LTCONF_CHUNK;
 
 text:
 	c->line_off = d - line_start;
 	ffstr_set(in, d, end - d);
+	c->flags &= ~LTCONF_FCHUNKED;
 	if (!(c->flags & LTCONF_FKEY)) {
 		c->flags |= LTCONF_FKEY;
 		return LTCONF_KEY;
@@ -299,3 +302,9 @@ err:
 
 /** Return current line # starting at 1 */
 #define ltconf_line(c)  ((c)->line+1)
+
+/** Return current column # starting at 1 */
+#define ltconf_col(c)  ((c)->line_off+1)
+
+/** Get error message after LTCONF_ERROR */
+#define ltconf_error(c)  ((c)->error)
