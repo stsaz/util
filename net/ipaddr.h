@@ -375,7 +375,7 @@ static inline int ffip_port_split(ffstr s, void *ip6, ffuint *port)
 		if (s.len == 0)
 			return -1;
 
-		uint brkt = (s.ptr[0] == '[');
+		ffuint brkt = (s.ptr[0] == '[');
 		r = ffip6_parse((ffip6*)ip, s.ptr + brkt, s.len - brkt);
 
 		if (brkt) {

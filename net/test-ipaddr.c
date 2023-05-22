@@ -1,19 +1,14 @@
-/**
-Copyright (c) 2019 Simon Zolin
-*/
+/** util: ipaddr.h tester */
 
-#include <FF/net/ipaddr.h>
-#include <FF/net/proto.h>
-#include <FF/net/url.h>
 #include <FFOS/test.h>
+#include <net/ipaddr.h>
+#define FFSTR(s)  (char*)(s), FFS_LEN(s)
 
 static int test_ip4()
 {
 	ffip4 a4;
 	char buf[64];
 	ffstr sip;
-
-	FFTEST_FUNC;
 
 	sip.ptr = buf;
 
@@ -39,8 +34,8 @@ static int test_ip4()
 	sip.len = ffip4_tostr((void*)"\x7f\0\0\x01", buf, FF_COUNT(buf));
 	x(ffstr_eqz(&sip, "127.0.0.1"));
 
-	sip.len = ffip_tostr(buf, FF_COUNT(buf), AF_INET, (void*)"\x7f\0\0\x01", 8080);
-	x(ffstr_eqz(&sip, "127.0.0.1:8080"));
+	// sip.len = ffip_tostr(buf, FF_COUNT(buf), AF_INET, (void*)"\x7f\0\0\x01", 8080);
+	// x(ffstr_eqz(&sip, "127.0.0.1:8080"));
 
 	x(ffip4_mask(33, buf, FF_COUNT(buf)) < 0);
 	sip.len = ffip4_mask(32, buf, FF_COUNT(buf));
@@ -86,13 +81,11 @@ static const char *const ip6_data[] = {
 
 static int test_ip6()
 {
-	char a[16];
 	char buf[64];
 	ffstr sip;
 	size_t i;
 	ffip6 a6;
 
-	FFTEST_FUNC;
 
 	sip.ptr = buf;
 
@@ -104,20 +97,11 @@ static int test_ip6()
 		x(ffstr_eqz(&sip, sip6));
 	}
 
+	/*char a[16];
 	ffmem_zero(a, 16);
 	a[15] = '\x01';
 	sip.len = ffip_tostr(buf, FF_COUNT(buf), AF_INET6, a, 8080);
-	x(ffstr_eqz(&sip, "[::1]:8080"));
-
-
-	{
-		ffaddr a;
-		ffaddr_init(&a);
-		ffip6_set(&a, &in6addr_loopback);
-		ffip_setport(&a, 8080);
-		sip.len = ffaddr_tostr(&a, buf, FF_COUNT(buf), FFADDR_USEPORT);
-		x(ffstr_eqz(&sip, "[::1]:8080"));
-	}
+	x(ffstr_eqz(&sip, "[::1]:8080"));*/
 
 	for (i = 0;  i < FF_COUNT(ip6_data);  i += 2) {
 		const char *ip6 = ip6_data[i];
@@ -155,23 +139,9 @@ static int test_ip6()
 	return 0;
 }
 
-static int test_addr()
-{
-	ffaddr a;
-	x(0 == ffaddr_set(&a, FFSTR("127.0.0.1"), FFSTR("8080")));
-	x(AF_INET == ffaddr_family(&a) && 8080 == ffip_port(&a));
-
-	x(0 == ffaddr_set(&a, FFSTR("::1"), FFSTR("8080")));
-	x(AF_INET6 == ffaddr_family(&a));
-
-	x(0 != ffaddr_set(&a, FFSTR("::11111"), FFSTR("8080")));
-	x(0 != ffaddr_set(&a, FFSTR("::1"), FFSTR("88080")));
-	return 0;
-}
-
+#if 0
 static void test_eth(void)
 {
-	FFTEST_FUNC;
 	ffeth mac;
 	char smac[FFETH_STRLEN];
 	x(0 > ffeth_parse(&mac, "12:34:56:78:ab:XX", FFETH_STRLEN));
@@ -179,30 +149,39 @@ static void test_eth(void)
 	x(FFETH_STRLEN == ffeth_tostr(smac, sizeof(smac), &mac));
 	x(!ffmemcmp(smac, "12:34:56:78:AB:CD", FFETH_STRLEN));
 }
+#endif
+
+void test_ip_split()
+{
+	char ip[16];
+	ffuint port;
+
+	x(1 == ffip_port_split(FFSTR_Z("127.0.0.1"), ip, &port));
+	x(!memcmp(ip, "\0\0\0\0\0\0\0\0\0\0\xff\xff\x7f\x00\x00\x01", 16));
+
+	x(3 == ffip_port_split(FFSTR_Z("127.0.0.1:8080"), ip, &port));
+	x(!memcmp(ip, "\0\0\0\0\0\0\0\0\0\0\xff\xff\x7f\x00\x00\x01", 16));
+	x(port == 8080);
+
+	x(1 == ffip_port_split(FFSTR_Z("::1"), ip, &port));
+	x(!memcmp(ip, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x01", 16));
+
+	x(3 == ffip_port_split(FFSTR_Z("[::1]:8080"), ip, &port));
+	x(!memcmp(ip, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x01", 16));
+	x(port == 8080);
+
+	x(2 == ffip_port_split(FFSTR_Z("8080"), ip, &port));
+	x(port == 8080);
+
+	x(0 > ffip_port_split(FFSTR_Z("127.0.0.1:"), ip, &port));
+	x(0 > ffip_port_split(FFSTR_Z(":8080"), ip, &port));
+}
 
 int test_ip()
 {
-	ffstr ip, port;
-	x(0 == ffip_split(FFSTR("127.0.0.1"), &ip, &port)
-		&& ffstr_eqz(&ip, "127.0.0.1")
-		&& ffstr_eqz(&port, ""));
-	x(0 == ffip_split(FFSTR("127.0.0.1:8080"), &ip, &port)
-		&& ffstr_eqz(&ip, "127.0.0.1")
-		&& ffstr_eqz(&port, "8080"));
-	x(0 == ffip_split(FFSTR("[::1]"), &ip, &port)
-		&& ffstr_eqz(&ip, "::1")
-		&& ffstr_eqz(&port, ""));
-	x(0 == ffip_split(FFSTR("[::1]:8080"), &ip, &port)
-		&& ffstr_eqz(&ip, "::1")
-		&& ffstr_eqz(&port, "8080"));
-	x(0 == ffip_split(FFSTR(":8080"), &ip, &port)
-		&& ffstr_eqz(&ip, "")
-		&& ffstr_eqz(&port, "8080"));
-	x(0 != ffip_split(FFSTR("127.0.0.1:"), &ip, &port));
-
 	test_ip4();
 	test_ip6();
-	test_addr();
-	test_eth();
+	// test_eth();
+	test_ip_split();
 	return 0;
 }

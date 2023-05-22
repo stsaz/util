@@ -5,7 +5,6 @@ Feel free to use them if you want, everything here is absolutely free.
 
 Unsorted:
 
-	html.h              HTML parser
 	ico-read.h          .ico reader
 	jni-helper.h        JNI wrapper
 	pe.c
@@ -29,6 +28,7 @@ Data:
 	data/conf2-writer.h     ffbase: conf writer
 	data/conf2.h            configuration parser
 	data/fntree.h           File name tree with economical memory management.
+	data/html.h             HTML parser
 	data/ltconf.h           Light config parser
 	data/mbuf.h             Buffer that can be linked with another buffer
 	data/range.h            memory region pointer
