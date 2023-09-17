@@ -1,5 +1,5 @@
 /** GUI-winapi: window
-2014,2022, Simon Zolin */
+2014, Simon Zolin */
 
 #pragma once
 #include "winapi.h"
@@ -127,7 +127,7 @@ static inline void ffui_wnd_setplacement(ffui_wnd *w, uint showcmd, const ffui_p
 static inline int ffui_wnd_tooltip(ffui_wnd *w, ffui_ctl *ctl, const char *text, ffsize len)
 {
 	TTTOOLINFOW ti = {};
-	ffsyschar *pw, ws[255];
+	wchar_t *pw, ws[255];
 	ffsize n = FF_COUNT(ws) - 1;
 
 	if (w->ttip == NULL
@@ -166,3 +166,14 @@ FF_EXTERN int ffui_wnd_ghotkey_reg(ffui_wnd *w, uint hk, uint cmd);
 
 /** Unregister all global hotkeys associated with this window. */
 FF_EXTERN void ffui_wnd_ghotkey_unreg(ffui_wnd *w);
+
+
+#ifdef __cplusplus
+struct ffui_wndxx : ffui_wnd {
+	void show(uint show) { ffui_show(this, show); }
+	void title(const char *sz) { ffui_settextz(this, sz); }
+	void close() { ffui_wnd_close(this); }
+	ffui_pos pos() { ffui_pos p; ffui_wnd_placement(this, &p); return p; }
+	void place(const ffui_pos &pos) { ffui_wnd_setplacement(this, SW_SHOWNORMAL, &pos); }
+};
+#endif

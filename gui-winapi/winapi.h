@@ -1,6 +1,5 @@
 /** GUI based on Windows API.
-Copyright (c) 2014 Simon Zolin
-*/
+2014, Simon Zolin */
 
 #pragma once
 #define UNICODE
@@ -11,7 +10,7 @@ Copyright (c) 2014 Simon Zolin
 #include <commctrl.h>
 #include <uxtheme.h>
 
-#if 0
+#ifdef FFGUI_DEBUG
 	#include <FFOS/std.h>
 	#define _ffui_log fflog
 #else
@@ -42,23 +41,11 @@ typedef struct ffui_wnd ffui_wnd;
 FF_EXTERN int ffui_init(void);
 FF_EXTERN void ffui_uninit(void);
 
-FF_EXTERN int _ffui_dpi;
+FF_EXTERN uint _ffui_dpi;
 FF_EXTERN RECT _ffui_screen_area;
 
-
-// HOTKEYS
-typedef uint ffui_hotkey;
-
-/** Parse hotkey string, e.g. "Ctrl+Alt+Shift+Q".
-Return: low-word: char key or vkey, hi-word: control flags;  0 on error. */
-FF_EXTERN ffui_hotkey ffui_hotkey_parse(const char *s, size_t len);
-
-/** Register global hotkey.
-Return 0 on error. */
-FF_EXTERN int ffui_hotkey_register(void *ctl, ffui_hotkey hk);
-
-/** Unregister global hotkey. */
-FF_EXTERN void ffui_hotkey_unreg(void *ctl, int id);
+#define _ffui_dpi_descale(x)  ((x) * 96 / _ffui_dpi)
+#define _ffui_dpi_scale(x)  ((x) * _ffui_dpi / 96)
 
 
 // POINT
@@ -133,12 +120,13 @@ static inline void ffui_pos_fromrect(ffui_pos *pos, const RECT *rect)
 
 FF_EXTERN void ffui_pos_limit(ffui_pos *r, const ffui_pos *screen);
 
-FF_EXTERN uint ffui_dpi();
-FF_EXTERN void ffui_dpi_set(uint dpi);
-FF_EXTERN int ffui_dpi_scale(int x);
-FF_EXTERN int ffui_dpi_descale(int x);
-FF_EXTERN void ffui_dpi_scalepos(ffui_pos *r);
-FF_EXTERN void ffui_dpi_descalepos(ffui_pos *r);
+static inline void _ffui_dpi_descalepos(ffui_pos *r)
+{
+	r->x = _ffui_dpi_descale(r->x);
+	r->y = _ffui_dpi_descale(r->y);
+	r->cx = _ffui_dpi_descale(r->cx);
+	r->cy = _ffui_dpi_descale(r->cy);
+}
 
 
 // ICON
@@ -272,13 +260,18 @@ FF_EXTERN void ffui_getpos2(void *ctl, ffui_pos *r, uint flags);
 #define ffui_getpos(ctl, r) \
 	ffui_getpos2(ctl, r, FFUI_FPOS_DPISCALE | FFUI_FPOS_REL)
 
-FF_EXTERN int ffui_setpos(void *ctl, int x, int y, int cx, int cy, int flags);
+static inline int ffui_setpos(void *ctl, int x, int y, int cx, int cy, int flags)
+{
+	return !SetWindowPos(((ffui_ctl*)ctl)->h, HWND_TOP, _ffui_dpi_scale(x), _ffui_dpi_scale(y)
+		, _ffui_dpi_scale(cx), _ffui_dpi_scale(cy), SWP_NOACTIVATE | flags);
+}
+
 #define ffui_setposrect(ctl, rect, flags) \
 	ffui_setpos(ctl, (rect)->x, (rect)->y, (rect)->cx, (rect)->cy, flags)
 
 static inline int ffui_settext(void *c, const char *text, ffsize len)
 {
-	ffsyschar *w, ws[255];
+	wchar_t *w, ws[255];
 	ffsize n = FF_COUNT(ws) - 1;
 	if (NULL == (w = ffs_utow(ws, &n, text, len)))
 		return -1;
@@ -292,32 +285,7 @@ static inline int ffui_settext(void *c, const char *text, ffsize len)
 #define ffui_settextstr(c, str)  ffui_settext(c, (str)->ptr, (str)->len)
 
 #define ffui_textlen(c)  ffui_send((c)->h, WM_GETTEXTLENGTH, 0, 0)
-static inline int ffui_textstr(void *_c, ffstr *dst)
-{
-	ffui_ctl *c = _c;
-	ffsyschar ws[255], *w = ws;
-	ffsize len = ffui_send(c->h, WM_GETTEXTLENGTH, 0, 0);
-
-	if (len >= FF_COUNT(ws)
-		&& NULL == (w = ffws_alloc(len + 1)))
-		goto fail;
-	ffui_send(c->h, WM_GETTEXT, len + 1, w);
-
-	dst->len = ff_wtou(NULL, 0, w, len, 0);
-	if (NULL == (dst->ptr = ffmem_alloc(dst->len + 1)))
-		goto fail;
-
-	ff_wtou(dst->ptr, dst->len + 1, w, len + 1, 0);
-	if (w != ws)
-		ffmem_free(w);
-	return (int)dst->len;
-
-fail:
-	if (w != ws)
-		ffmem_free(w);
-	dst->len = 0;
-	return -1;
-}
+FF_EXTERN int ffui_textstr(void *_c, ffstr *dst);
 
 #define ffui_show(c, show)  ShowWindow((c)->h, (show) ? SW_SHOW : SW_HIDE)
 
@@ -347,6 +315,25 @@ FF_EXTERN int ffui_ctl_destroy(void *c);
 FF_EXTERN void* ffui_ctl_parent(void *c);
 
 FF_EXTERN int ffui_ctl_setcursor(void *c, HCURSOR h);
+
+
+// HOTKEYS
+typedef uint ffui_hotkey;
+
+/** Parse hotkey string, e.g. "Ctrl+Alt+Shift+Q".
+Return: low-word: char key or vkey, hi-word: control flags;  0 on error. */
+FF_EXTERN ffui_hotkey ffui_hotkey_parse(const char *s, size_t len);
+
+/** Register global hotkey.
+Return 0 on error. */
+FF_EXTERN int ffui_hotkey_register(void *ctl, ffui_hotkey hk);
+
+/** Unregister global hotkey. */
+static inline void ffui_hotkey_unreg(void *ctl, int id)
+{
+	UnregisterHotKey(((ffui_ctl*)ctl)->h, id);
+	GlobalDeleteAtom(id);
+}
 
 
 // FILE OPERATIONS
@@ -429,14 +416,14 @@ static inline void ffui_lbl_setcursor(ffui_label *c, uint type)
 
 
 // IMAGE
-typedef struct ffui_img {
+typedef struct ffui_image {
 	FFUI_CTL;
 	uint click_id;
-} ffui_img;
+} ffui_image;
 
-FF_EXTERN int ffui_img_create(ffui_img *im, ffui_wnd *parent);
+FF_EXTERN int ffui_img_create(ffui_image *im, ffui_wnd *parent);
 
-static inline void ffui_img_set(ffui_img *im, ffui_icon *ico)
+static inline void ffui_img_set(ffui_image *im, ffui_icon *ico)
 {
 	ffui_send(im->h, STM_SETIMAGE, IMAGE_ICON, ico->h);
 }
@@ -469,7 +456,7 @@ FF_EXTERN int ffui_stbar_create(ffui_stbar *c, ffui_wnd *parent);
 
 static inline void ffui_stbar_settext(ffui_stbar *sb, int idx, const char *text, ffsize len)
 {
-	ffsyschar *w, ws[255];
+	wchar_t *w, ws[255];
 	ffsize n = FF_COUNT(ws) - 1;
 	if (NULL == (w = ffs_utow(ws, &n, text, len)))
 		return;
@@ -551,7 +538,7 @@ typedef struct ffui_view ffui_view;
 union ffui_anyctl {
 	ffui_ctl *ctl;
 	ffui_label *lbl;
-	ffui_img *img;
+	ffui_image *img;
 	ffui_btn *btn;
 	ffui_checkbox *cb;
 	ffui_edit *edit;
@@ -566,7 +553,7 @@ union ffui_anyctl {
 
 
 // MESSAGE LOOP
-#define ffui_quitloop()  PostQuitMessage(0)
+#define ffui_post_quitloop()  PostQuitMessage(0)
 
 FF_EXTERN int ffui_runonce(void);
 
@@ -580,3 +567,33 @@ typedef void (*ffui_handler)(void *param);
 
 /** Post a task to the thread running GUI message loop. */
 FF_EXTERN void ffui_thd_post(ffui_handler func, void *udata);
+
+
+#ifdef __cplusplus
+struct ffui_buttonxx : ffui_btn {
+	void text(const char *sz) { ffui_settextz(this, sz); }
+	void enable(uint val) { EnableWindow(h, val); }
+};
+
+struct ffui_checkboxxx : ffui_checkbox {
+	ffui_checkboxxx& check(bool val) {
+		ffui_checkbox_check(this, val);
+		return *this;
+	}
+	bool checked() { return ffui_checkbox_checked(this); }
+};
+
+struct ffui_trackbarxx : ffui_trkbar {
+	void set(uint value) { ffui_trk_set(this, value); }
+	uint get() { return ffui_trk_val(this); }
+	void range(uint range) { ffui_trk_setrange(this, range); }
+};
+
+struct ffui_stbarxx : ffui_stbar {
+	void text(const char *sz) { ffui_settextz(this, sz); }
+};
+
+struct ffui_labelxx : ffui_label {
+	void text(const char *sz) { ffui_settextz(this, sz); }
+};
+#endif

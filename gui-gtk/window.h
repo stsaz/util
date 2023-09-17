@@ -1,5 +1,5 @@
 /** GUI/GTK+: window
-2019,2022 Simon Zolin
+2019,2022, Simon Zolin
 */
 
 #pragma once
@@ -46,7 +46,7 @@ typedef uint ffui_hotkey;
 
 /** Parse hotkey string, e.g. "Ctrl+Alt+Shift+Q".
 Return: low-word: char key or vkey, hi-word: control flags;  0 on error. */
-FF_EXTERN ffui_hotkey ffui_hotkey_parse(const char *s, size_t len);
+FF_EXTERN ffui_hotkey ffui_hotkey_parse(const char *s, ffsize len);
 
 typedef struct ffui_wnd_hotkey {
 	ffui_hotkey hk;
@@ -54,7 +54,7 @@ typedef struct ffui_wnd_hotkey {
 } ffui_wnd_hotkey;
 
 /** Set hotkey table. */
-FF_EXTERN int ffui_wnd_hotkeys(ffui_wnd *w, const ffui_wnd_hotkey *hotkeys, size_t n);
+FF_EXTERN int ffui_wnd_hotkeys(ffui_wnd *w, const ffui_wnd_hotkey *hotkeys, ffsize n);
 
 #define ffui_wnd_settextz(w, text)  gtk_window_set_title((w)->h, text)
 static inline void ffui_wnd_settextstr(ffui_wnd *w, const ffstr *str)
@@ -82,3 +82,14 @@ static inline void ffui_wnd_setplacement(ffui_wnd *w, uint showcmd, const ffui_p
 	gtk_window_move(w->h, pos->x, pos->y);
 	gtk_window_set_default_size(w->h, pos->cx, pos->cy);
 }
+
+
+#ifdef __cplusplus
+struct ffui_wndxx : ffui_wnd {
+	void show(uint show) { ffui_show(this, show); }
+	void title(const char *sz) { ffui_send_wnd_settext(this, sz); }
+	void close() { ffui_wnd_close(this); }
+	ffui_pos pos() { ffui_pos p; ffui_wnd_pos(this, &p); return p; }
+	void place(const ffui_pos &pos) { ffui_wnd_setplacement(this, 0, &pos); }
+};
+#endif

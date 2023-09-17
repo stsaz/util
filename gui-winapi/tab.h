@@ -1,5 +1,5 @@
 /** GUI-winapi: tab
-2014,2022, Simon Zolin */
+2014, Simon Zolin */
 
 #pragma once
 #include "winapi.h"
@@ -75,7 +75,7 @@ static inline void ffui_tab_seticonlist(ffui_tab *t, ffui_iconlist *il)
 
 static inline int ffui_tab_ins(ffui_tab *t, int idx, ffui_tabitem *it)
 {
-	int r = ffui_ctl_send(t, TCM_INSERTITEM, idx, &it->item);
+	int r = ffui_ctl_send(t, TCM_INSERTITEMW, idx, &it->item);
 	ffui_tab_reset(it);
 	return r;
 }
@@ -84,14 +84,29 @@ static inline int ffui_tab_ins(ffui_tab *t, int idx, ffui_tabitem *it)
 
 static inline ffbool ffui_tab_set(ffui_tab *t, int idx, ffui_tabitem *it)
 {
-	int r = ffui_ctl_send(t, TCM_SETITEM, idx, &it->item);
+	int r = ffui_ctl_send(t, TCM_SETITEMW, idx, &it->item);
 	ffui_tab_reset(it);
 	return r;
 }
 
 static inline ffbool ffui_tab_get(ffui_tab *t, int idx, ffui_tabitem *it)
 {
-	int r = ffui_ctl_send(t, TCM_GETITEM, idx, &it->item);
+	int r = ffui_ctl_send(t, TCM_GETITEMW, idx, &it->item);
 	ffui_tab_reset(it);
 	return r;
 }
+
+
+#ifdef __cplusplus
+struct ffui_tabxx : ffui_tab {
+	void add(const char *sz) {
+		ffui_tabitem ti = {};
+		ffui_tab_settextz(&ti, sz);
+		ffui_tab_append(this, &ti);
+	}
+	void del(u_int i) { ffui_tab_del(this, i); }
+	void select(u_int i) { ffui_tab_setactive(this, i); }
+	u_int count() { return ffui_tab_count(this); }
+	u_int changed() { return ffui_tab_active(this); }
+};
+#endif

@@ -1,5 +1,5 @@
 /** GUI-winapi: standard dialogs
-2014,2022, Simon Zolin */
+2014, Simon Zolin */
 
 #pragma once
 #include "winapi.h"
@@ -23,7 +23,7 @@ static inline void ffui_dlg_title(ffui_dialog *d, const char *title, ffsize len)
 	ffmem_free((void*)d->of.lpstrTitle);
 	if (NULL == (d->of.lpstrTitle = ffs_utow(NULL, &n, title, len)))
 		return;
-	ffsyschar *w = (void*)d->of.lpstrTitle;
+	wchar_t *w = (wchar_t*)d->of.lpstrTitle;
 	w[n] = '\0';
 }
 #define ffui_dlg_titlez(d, sz)  ffui_dlg_title(d, sz, ffsz_len(sz))
@@ -47,7 +47,7 @@ Return file name;  NULL on error. */
    singlesel: "name \0" */
 static inline char* ffui_dlg_open(ffui_dialog *d, ffui_wnd *wnd)
 {
-	ffsyschar *w;
+	wchar_t *w;
 	ffsize cap = ((d->of.Flags & OFN_ALLOWMULTISELECT) ? 64*1024 : 4096);
 	if (NULL == (w = ffws_alloc(cap)))
 		return NULL;
@@ -68,7 +68,7 @@ static inline char* ffui_dlg_open(ffui_dialog *d, ffui_wnd *wnd)
 		d->pname += d->of.nFileOffset; //skip directory
 
 	} else {
-		d->pname += ffq_len(w); //for ffui_dlg_nextname() to return NULL
+		d->pname += wcslen(w); //for ffui_dlg_nextname() to return NULL
 		ffmem_free(d->name);
 		if (NULL == (d->name = ffsz_alloc_wtou(w)))
 			return NULL;
@@ -82,7 +82,7 @@ static inline char* ffui_dlg_open(ffui_dialog *d, ffui_wnd *wnd)
 @fn: default filename */
 static inline char* ffui_dlg_save(ffui_dialog *d, ffui_wnd *wnd, const char *fn, ffsize fnlen)
 {
-	ffsyschar ws[4096];
+	wchar_t ws[4096];
 	ffsize n = 0;
 
 	if (fn != NULL)
@@ -114,14 +114,14 @@ static inline char* ffui_dlg_nextname(ffui_dialog *d)
 {
 	ffmem_free(d->name); d->name = NULL; //free the previous name
 
-	ffsize cap, namelen = ffq_len(d->pname);
+	ffsize cap, namelen = wcslen(d->pname);
 	if (namelen == 0) {
 		ffmem_free(d->names); d->names = NULL;
 		return NULL;
 	}
 
 	cap = d->of.nFileOffset + ff_wtou(NULL, 0, d->pname, namelen, 0) + 1;
-	if (NULL == (d->name = ffmem_alloc(cap)))
+	if (NULL == (d->name = (char*)ffmem_alloc(cap)))
 		return NULL;
 
 	ffs_format(d->name, cap, "%q\\%*q", d->names, namelen + 1, d->pname);
@@ -139,7 +139,7 @@ enum FFUI_MSGDLG {
 static inline int ffui_msgdlg_show(const char *title, const char *text, ffsize len, uint flags)
 {
 	int r = -1;
-	ffsyschar *w = NULL, *wtit = NULL;
+	wchar_t *w = NULL, *wtit = NULL;
 	ffsize n;
 
 	if (NULL == (w = ffs_utow(NULL, &n, text, len)))

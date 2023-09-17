@@ -1,7 +1,8 @@
-/** fmedia: GUI variables
+/** phiola: GUI variables
 2022, Simon Zolin */
 
 #include <ffbase/map.h>
+#include <ffbase/conf.h>
 
 struct guivar {
 	ffstr name, val;
@@ -54,7 +55,7 @@ static inline void vars_set(ffmap *vs, ffstr name, ffstr val)
 	}
 
 	ffstr_setstr(&v->name, &name);
-	ffstr_setstr(&v->val, &val); //!
+	ffstr_setstr(&v->val, &val);
 	if (nu)
 		ffmap_add(vs, name.ptr, name.len, v);
 }
@@ -62,34 +63,26 @@ static inline void vars_set(ffmap *vs, ffstr name, ffstr val)
 /** Load variables from data:
 (NAME "VAL" \n)...
 */
-static inline int vars_load(ffmap *vs, const ffstr *data)
+static inline int vars_load(ffmap *vs, ffstr data)
 {
-	int rc;
-	ffconf conf = {};
-	ffconf_init(&conf);
-
-	ffstr in = FFSTR_INITSTR(data), out, key = {}, val;
-	while (in.len != 0) {
-		int r = ffconf_parse3(&conf, &in, &out);
+	struct ffconf c = {};
+	ffstr s, key = {};
+	while (data.len) {
+		int r = ffconf_read(&c, &data, &s);
 		switch (r) {
-		case FFCONF_RMORE:
+		case FFCONF_MORE: break;
+
+		case FFCONF_KEY:
+			key = s;  break;
+
+		case FFCONF_VAL:
+			vars_set(vs, key, s);
 			break;
-		case FFCONF_RKEY:
-			key = out;
-			break;
-		case FFCONF_RVAL:
-			val = out;
-			vars_set(vs, key, val);
-			break;
+
 		default:
-			rc = r;
-			goto end;
+			return r;
 		}
 	}
 
-	rc = 0;
-
-end:
-	ffconf_fin(&conf);
-	return rc;
+	return 0;
 }

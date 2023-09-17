@@ -1,9 +1,10 @@
 /** GUI/GTK+: listview
-2019,2022 Simon Zolin
+2019,2022, Simon Zolin
 */
 
 #pragma once
 #include "gtk.h"
+#include <ffbase/vector.h>
 
 struct ffui_view_disp {
 	uint idx;
@@ -41,9 +42,13 @@ struct ffui_viewcol {
 	uint width;
 };
 
-#define ffui_viewcol_reset(vc)  ffmem_free0((vc)->text)
+#define ffui_viewcol_reset(vc) \
+do { \
+	ffmem_free((vc)->text); \
+	(vc)->text = NULL; \
+} while (0)
 
-static inline void ffui_viewcol_settext(ffui_viewcol *vc, const char *text, size_t len)
+static inline void ffui_viewcol_settext(ffui_viewcol *vc, const char *text, ffsize len)
 {
 	vc->text = ffsz_dupn(text, len);
 }
@@ -72,7 +77,7 @@ static inline void ffui_view_inscol(ffui_view *v, int pos, ffui_viewcol *vc)
 	ffui_viewcol_reset(vc);
 }
 
-static inline void ffui_view_setcol(ffui_view *v, int pos, ffui_viewcol *vc)
+static inline void ffui_view_setcol(ffui_view *v, int pos, const ffui_viewcol *vc)
 {
 	GtkTreeViewColumn *col = gtk_tree_view_get_column(GTK_TREE_VIEW(v->h), pos);
 	if (vc->text != NULL)
@@ -81,25 +86,10 @@ static inline void ffui_view_setcol(ffui_view *v, int pos, ffui_viewcol *vc)
 		gtk_tree_view_column_set_fixed_width(col, vc->width);
 }
 
-/** Set column width */
-static inline void ffui_view_setcol_width(ffui_view *v, int pos, uint width)
-{
-	ffui_viewcol vc = { .width = width };
-	ffui_view_setcol(v, pos, &vc);
-}
-
 static inline void ffui_view_col(ffui_view *v, int pos, ffui_viewcol *vc)
 {
 	GtkTreeViewColumn *col = gtk_tree_view_get_column(GTK_TREE_VIEW(v->h), pos);
 	vc->width = gtk_tree_view_column_get_width(col);
-}
-
-/** Get column width */
-static inline uint ffui_view_col_width(ffui_view *v, int pos)
-{
-	ffui_viewcol vc = {};
-	ffui_view_col(v, pos, &vc);
-	return vc.width;
 }
 
 /** Get the number of columns. */
@@ -115,13 +105,13 @@ typedef struct ffui_viewitem {
 
 static inline void ffui_view_iteminit(ffui_viewitem *it)
 {
-	ffmem_tzero(it);
+	ffmem_zero_obj(it);
 }
 
 static inline void ffui_view_itemreset(ffui_viewitem *it)
 {
 	if (it->text_alloc) {
-		ffmem_free0(it->text);
+		ffmem_free(it->text);  it->text = NULL;
 		it->text_alloc = 0;
 	}
 }
@@ -129,7 +119,7 @@ static inline void ffui_view_itemreset(ffui_viewitem *it)
 #define ffui_view_setindex(it, i)  (it)->idx = (i)
 
 #define ffui_view_settextz(it, sz)  (it)->text = (char*)(sz)
-static inline void ffui_view_settext(ffui_viewitem *it, const char *text, size_t len)
+static inline void ffui_view_settext(ffui_viewitem *it, const char *text, ffsize len)
 {
 	it->text = ffsz_dupn(text, len);
 	it->text_alloc = 1;
@@ -189,36 +179,47 @@ typedef struct ffui_sel {
 	ffsize off;
 } ffui_sel;
 
+/** Get the first selected index
+Return -1 on error */
+static inline int ffui_view_selected_first(const ffui_view *v)
+{
+	GtkTreeSelection *tvsel = gtk_tree_view_get_selection(GTK_TREE_VIEW(v->h));
+	if (gtk_tree_selection_count_selected_rows(tvsel) <= 0)
+		return -1;
+	GList *rows = gtk_tree_selection_get_selected_rows(tvsel, NULL);
+	GtkTreePath *path = (GtkTreePath*)rows->data;
+	int *ii = gtk_tree_path_get_indices(path);
+	int r = ii[0];
+	g_list_free_full(rows, (GDestroyNotify)gtk_tree_path_free);
+	return r;
+}
+
 /** Get array of selected items.
-Return ffui_sel*.  Free with ffui_view_sel_free(). */
-static inline ffui_sel* ffui_view_getsel(ffui_view *v)
+Return uint[]; free with ffslice_free(). */
+static inline ffslice ffui_view_selected(ffui_view *v)
 {
 	GtkTreeSelection *tvsel = gtk_tree_view_get_selection(GTK_TREE_VIEW(v->h));
 	GList *rows = gtk_tree_selection_get_selected_rows(tvsel, NULL);
 	uint n = gtk_tree_selection_count_selected_rows(tvsel);
 
-	ffvec a = {};
-	if (NULL == ffvec_allocT(&a, n, uint))
-		return NULL;
+	ffslice a = {};
+	if (NULL == ffslice_allocT(&a, n, uint))
+		return a;
 
 	for (GList *l = rows;  l != NULL;  l = l->next) {
 		GtkTreePath *path = (GtkTreePath*)l->data;
 		int *ii = gtk_tree_path_get_indices(path);
-		*ffvec_pushT(&a, uint) = ii[0];
+		*ffslice_pushT(&a, n, uint) = ii[0];
 	}
 	g_list_free_full(rows, (GDestroyNotify)gtk_tree_path_free);
 
-	ffui_sel *sel = ffmem_new(ffui_sel);
-	sel->ptr = (char*)a.ptr;
-	sel->len = a.len;
-	sel->off = 0;
-	return sel;
+	return a;
 }
 
 static inline void ffui_view_sel_free(ffui_sel *sel)
 {
-	if (sel == NULL)
-		return;
+	if (sel == NULL) return;
+
 	ffmem_free(sel->ptr);
 	ffmem_free(sel);
 }
@@ -253,7 +254,7 @@ FF_EXTERN void ffui_view_ins(ffui_view *v, int pos, ffui_viewitem *it);
 
 static inline void ffui_view_set(ffui_view *v, int sub, ffui_viewitem *it)
 {
-	_ffui_log("sub:%d", sub);
+	_ffui_log("sub:%d '%s'", sub, it->text);
 	GtkTreeIter iter;
 	if (gtk_tree_model_iter_nth_child(GTK_TREE_MODEL(v->store), &iter, NULL, it->idx))
 		gtk_list_store_set(GTK_LIST_STORE(v->store), &iter, sub, it->text, -1);
@@ -271,7 +272,6 @@ static inline void ffui_view_set_i_textz(ffui_view *v, int idx, int sub, const c
 
 static inline void ffui_view_rm(ffui_view *v, ffui_viewitem *it)
 {
-	_ffui_log("idx:%d", it->idx);
 	GtkTreeIter iter;
 	if (gtk_tree_model_iter_nth_child(GTK_TREE_MODEL(v->store), &iter, NULL, it->idx))
 		gtk_list_store_remove(GTK_LIST_STORE(v->store), &iter);
@@ -306,3 +306,48 @@ static inline void ffui_view_popupmenu(ffui_view *v, ffui_menu *m)
 		gtk_widget_show_all(m->h);
 	}
 }
+
+
+#ifdef __cplusplus
+struct ffui_viewitemxx : ffui_viewitem {
+	ffui_viewitemxx(ffstr s) { ffmem_zero_obj(this); ffui_view_settextstr(this, &s); }
+};
+
+struct ffui_viewcolxx {
+	ffui_viewcol vc;
+	uint width() { return vc.width; }
+	void width(uint val) { vc.width = val; }
+};
+
+struct ffui_viewxx : ffui_view {
+	int append(ffstr text) {
+		ffui_viewitem vi = {};
+		ffui_view_settextstr(&vi, &text);
+		ffui_view_append(this, &vi);
+		return vi.idx;
+	}
+	void set(int idx, int col, ffstr text) {
+		ffui_viewitem vi = {};
+		vi.idx = idx;
+		ffui_view_settextstr(&vi, &text);
+		ffui_view_set(this, col, &vi);
+	}
+	void update(uint first, int delta) { ffui_post_view_setdata(this, first, delta); }
+	void clear() { ffui_post_view_clear(this); }
+	int focused() { return ffui_view_focused(this); }
+	ffslice selected() { return ffui_view_selected(this); }
+	int selected_first() { return ffui_view_selected_first(this); }
+	ffui_viewcolxx& column(int pos, ffui_viewcolxx *vc) {
+		ffui_view_col(this, pos, &vc->vc);
+		return *vc;
+	}
+	void column(int pos, const ffui_viewcolxx &vc) { ffui_view_setcol(this, pos, &vc.vc); }
+	void drag_drop_init(uint action_id) { ffui_view_dragdrop(this, action_id); }
+	uint scroll_vert() {
+		ffsize val;
+		ffui_send(this, FFUI_VIEW_SCROLL, &val);
+		return val;
+	}
+	void scroll_vert(uint val) { ffui_post_view_scroll_set(this, val); }
+};
+#endif

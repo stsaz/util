@@ -1,29 +1,16 @@
-/**
-Copyright (c) 2019 Simon Zolin
+/** GUI/GTK+
+2019, Simon Zolin
 */
 
+#include <FFOS/error.h>
 #include "gtk.h"
 #include "dialog.h"
 #include "view.h"
 #include "window.h"
+#include <ffbase/vector.h>
 #include <ffbase/atomic.h>
 #include <ffbase/lock.h>
 #include <FFOS/thread.h>
-
-
-// MENU
-// BUTTON
-// CHECKBOX
-// LABEL
-// EDITBOX
-// TRACKBAR
-// TAB
-// LISTVIEW
-// STATUSBAR
-// TRAYICON
-// DIALOG
-// WINDOW
-// MESSAGE LOOP
 
 ffuint64 _ffui_thd_id;
 
@@ -37,8 +24,7 @@ void ffui_run()
 	g_signal_handlers_disconnect_matched(h, G_SIGNAL_MATCH_FUNC | G_SIGNAL_MATCH_DATA, 0, 0, 0, G_CALLBACK(func), udata)
 
 
-// MENU
-static void _ffui_menu_activate(GtkWidget *mi, gpointer udata)
+void _ffui_menu_activate(GtkWidget *mi, gpointer udata)
 {
 	GtkWidget *parent_menu = mi;
 	ffui_wnd *wnd = NULL;
@@ -46,107 +32,37 @@ static void _ffui_menu_activate(GtkWidget *mi, gpointer udata)
 		parent_menu = gtk_widget_get_parent(parent_menu);
 		wnd = g_object_get_data(G_OBJECT(parent_menu), "ffdata");
 	}
-	uint id = (size_t)udata;
+	uint id = (ffsize)udata;
 	wnd->on_action(wnd, id);
 }
 
-void ffui_menu_setcmd(void *mi, uint id)
-{
-	g_signal_connect(mi, "activate", G_CALLBACK(&_ffui_menu_activate), (void*)(size_t)id);
-}
-
-void ffui_menu_setsubmenu(void *mi, ffui_menu *sub, ffui_wnd *wnd)
-{
-	gtk_menu_item_set_submenu(mi, sub->h);
-	g_object_set_data(G_OBJECT(sub->h), "ffdata", wnd);
-}
-
-
-// BUTTON
-static void _ffui_btn_clicked(GtkWidget *widget, gpointer udata)
+void _ffui_btn_clicked(GtkWidget *widget, gpointer udata)
 {
 	ffui_btn *b = udata;
 	b->wnd->on_action(b->wnd, b->action_id);
 }
 
-int ffui_btn_create(ffui_btn *b, ffui_wnd *parent)
-{
-	b->h = gtk_button_new();
-	b->wnd = parent;
-	g_signal_connect(b->h, "clicked", G_CALLBACK(&_ffui_btn_clicked), b);
-	return 0;
-}
-
-
-// CHECKBOX
 void _ffui_checkbox_clicked(GtkWidget *widget, gpointer udata)
 {
 	ffui_checkbox *cb = udata;
 	cb->wnd->on_action(cb->wnd, cb->action_id);
 }
 
-
-// LABEL
-int ffui_lbl_create(ffui_label *l, ffui_wnd *parent)
-{
-	l->h = gtk_label_new("");
-	l->wnd = parent;
-	return 0;
-}
-
-
-// EDITBOX
-static void _ffui_edit_changed(GtkEditable *editable, gpointer udata)
+void _ffui_edit_changed(GtkEditable *editable, gpointer udata)
 {
 	ffui_edit *e = udata;
 	if (e->change_id != 0)
 		e->wnd->on_action(e->wnd, e->change_id);
 }
 
-int ffui_edit_create(ffui_edit *e, ffui_wnd *parent)
-{
-	e->h = gtk_entry_new();
-	e->wnd = parent;
-	g_signal_connect(e->h, "changed", G_CALLBACK(_ffui_edit_changed), e);
-	return 0;
-}
-
-
-// TRACKBAR
-static void _ffui_trk_value_changed(GtkWidget *widget, gpointer udata)
+void _ffui_trk_value_changed(GtkWidget *widget, gpointer udata)
 {
 	ffui_trkbar *t = udata;
 	if (t->scroll_id != 0)
 		t->wnd->on_action(t->wnd, t->scroll_id);
 }
 
-int ffui_trk_create(ffui_trkbar *t, ffui_wnd *parent)
-{
-	t->uid = FFUI_UID_TRACKBAR;
-	t->h = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, 0, 100, 1);
-	gtk_scale_set_draw_value(GTK_SCALE(t->h), 0);
-	t->wnd = parent;
-	g_signal_connect(t->h, "value-changed", G_CALLBACK(&_ffui_trk_value_changed), t);
-	return 0;
-}
-
-void ffui_trk_setrange(ffui_trkbar *t, uint max)
-{
-	g_signal_handlers_block_by_func(t->h, G_CALLBACK(&_ffui_trk_value_changed), t);
-	gtk_range_set_range(GTK_RANGE((t)->h), 0, max);
-	g_signal_handlers_unblock_by_func(t->h, G_CALLBACK(&_ffui_trk_value_changed), t);
-}
-
-void ffui_trk_set(ffui_trkbar *t, uint val)
-{
-	g_signal_handlers_block_by_func(t->h, G_CALLBACK(&_ffui_trk_value_changed), t);
-	gtk_range_set_value(GTK_RANGE(t->h), val);
-	g_signal_handlers_unblock_by_func(t->h, G_CALLBACK(&_ffui_trk_value_changed), t);
-}
-
-
-// TAB
-static void _ffui_tab_switch_page(GtkNotebook *notebook, GtkWidget *page, guint page_num, gpointer udata)
+void _ffui_tab_switch_page(GtkNotebook *notebook, GtkWidget *page, guint page_num, gpointer udata)
 {
 	ffui_tab *t = udata;
 	t->changed_index = page_num;
@@ -159,7 +75,7 @@ int ffui_tab_create(ffui_tab *t, ffui_wnd *parent)
 		return -1;
 	t->wnd = parent;
 	gtk_box_pack_start(GTK_BOX(parent->vbox), t->h, /*expand=*/0, /*fill=*/0, /*padding=*/0);
-	g_signal_connect(t->h, "switch-page", G_CALLBACK(&_ffui_tab_switch_page), t);
+	g_signal_connect(t->h, "switch-page", G_CALLBACK(_ffui_tab_switch_page), t);
 	return 0;
 }
 
@@ -167,17 +83,17 @@ void ffui_tab_ins(ffui_tab *t, int idx, const char *textz)
 {
 	GtkWidget *label = gtk_label_new(textz);
 	GtkWidget *child = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-	g_signal_handlers_block_by_func(t->h, G_CALLBACK(&_ffui_tab_switch_page), t);
+	g_signal_handlers_block_by_func(t->h, G_CALLBACK(_ffui_tab_switch_page), t);
 	gtk_notebook_insert_page(GTK_NOTEBOOK(t->h), child, label, idx);
 	gtk_widget_show_all(t->h);
-	g_signal_handlers_unblock_by_func(t->h, G_CALLBACK(&_ffui_tab_switch_page), t);
+	g_signal_handlers_unblock_by_func(t->h, G_CALLBACK(_ffui_tab_switch_page), t);
 }
 
 void ffui_tab_setactive(ffui_tab *t, int idx)
 {
-	g_signal_handlers_block_by_func(t->h, G_CALLBACK(&_ffui_tab_switch_page), t);
+	g_signal_handlers_block_by_func(t->h, G_CALLBACK(_ffui_tab_switch_page), t);
 	gtk_notebook_set_current_page(GTK_NOTEBOOK(t->h), idx);
-	g_signal_handlers_unblock_by_func(t->h, G_CALLBACK(&_ffui_tab_switch_page), t);
+	g_signal_handlers_unblock_by_func(t->h, G_CALLBACK(_ffui_tab_switch_page), t);
 }
 
 
@@ -196,7 +112,7 @@ static void _ffui_view_drag_data_received(GtkWidget *wgt, GdkDragContext *contex
 {
 	gint len;
 	const void *ptr = gtk_selection_data_get_data_with_length(seldata, &len);
-	_ffui_log("seldata:[%u] %*s", len, (size_t)len, ptr);
+	_ffui_log("seldata:[%u] %*s", len, (ffsize)len, ptr);
 
 	ffui_view *v = userdata;
 	ffstr_set(&v->drop_data, ptr, len);
@@ -246,7 +162,7 @@ int ffui_fdrop_next(ffvec *fn, ffstr *dropdata)
 		ffstr_rskipchar1(&ln, '\r');
 		if (!ffstr_matchz(&ln, "file://"))
 			continue;
-		ffstr_shift(&ln, FFSLEN("file://"));
+		ffstr_shift(&ln, FFS_LEN("file://"));
 
 		if (NULL == ffvec_realloc(fn, ln.len, 1))
 			return -1;
@@ -297,7 +213,7 @@ static gboolean _ffui_view_button_press_event(GtkWidget *w, GdkEventButton *ev, 
 int ffui_view_create(ffui_view *v, ffui_wnd *parent)
 {
 	v->h = gtk_tree_view_new();
-	g_signal_connect(v->h, "row-activated", G_CALLBACK(&_ffui_view_row_activated), v);
+	g_signal_connect(v->h, "row-activated", G_CALLBACK(_ffui_view_row_activated), v);
 	v->wnd = parent;
 	v->rend = gtk_cell_renderer_text_new();
 	g_signal_connect(v->rend, "edited", (GCallback)_ffui_view_cell_edited, v);
@@ -311,7 +227,7 @@ int ffui_view_create(ffui_view *v, ffui_wnd *parent)
 static void view_prepare(ffui_view *v)
 {
 	uint ncol = gtk_tree_view_get_n_columns(GTK_TREE_VIEW(v->h));
-	GType *types = ffmem_allocT(ncol, GType);
+	GType *types = ffmem_alloc(ncol * sizeof(GType));
 	for (uint i = 0;  i != ncol;  i++) {
 		types[i] = G_TYPE_STRING;
 	}
@@ -327,7 +243,7 @@ void ffui_view_dragdrop(ffui_view *v, uint action_id)
 		view_prepare(v);
 
 	static const GtkTargetEntry ents[] = {
-		{ "text/plain", GTK_TARGET_OTHER_APP, 0 }
+		{ "text/uri-list", GTK_TARGET_OTHER_APP, 0 }
 	};
 	gtk_drag_dest_set(v->h, GTK_DEST_DEFAULT_ALL, ents, FF_COUNT(ents), GDK_ACTION_COPY);
 	g_signal_connect(v->h, "drag_data_received", G_CALLBACK(_ffui_view_drag_data_received), v);
@@ -383,9 +299,9 @@ void ffui_view_setdata(ffui_view *v, uint first, int delta)
 		v->disp.sub = 0;
 		v->wnd->on_action(v->wnd, v->dispinfo_id);
 
-		ffui_view_setindex(&it, i);
+		it.idx = i;
 		buf[v->disp.text.len] = '\0';
-		ffui_view_settextz(&it, buf);
+		it.text = (char*)buf;
 		int ins = 0;
 		if (i >= rows) {
 			ffui_view_ins(v, -1, &it);
@@ -398,7 +314,7 @@ void ffui_view_setdata(ffui_view *v, uint first, int delta)
 			rows++;
 			ins = 1;
 		}
-		// FFDBG_PRINTLN(0, "idx:%u  text:%s", i, buf);
+		_ffui_log("idx:%u  text:%s", i, buf);
 
 		for (uint c = 1;  c != cols;  c++) {
 			ffstr_set(&v->disp.text, buf, sizeof(buf) - 1);
@@ -408,19 +324,19 @@ void ffui_view_setdata(ffui_view *v, uint first, int delta)
 			if (ins && buf[0] == '\0')
 				continue;
 
-			ffui_view_setindex(&it, i);
+			it.idx = i;
 			buf[v->disp.text.len] = '\0';
-			ffui_view_settextz(&it, buf);
+			it.text = (char*)buf;
 			ffui_view_set(v, c, &it);
-			// FFDBG_PRINTLN(0, "idx:%u  text:%s", i, buf);
+			_ffui_log("idx:%u  text:%s", i, buf);
 		}
 	}
 
 	int i = first;
 	while (i > (int)n) {
-		ffui_view_setindex(&it, i);
+		it.idx = i;
 		ffui_view_rm(v, &it);
-		// FFDBG_PRINTLN(0, "removed idx:%u", i);
+		_ffui_log("removed idx:%u", i);
 		i--;
 	}
 }
@@ -447,7 +363,7 @@ int ffui_tray_create(ffui_trayicon *t, ffui_wnd *wnd)
 {
 	t->h = (void*)gtk_status_icon_new();
 	t->wnd = wnd;
-	g_signal_connect(t->h, "activate", G_CALLBACK(&_ffui_tray_activate), t);
+	g_signal_connect(t->h, "activate", G_CALLBACK(_ffui_tray_activate), t);
 	ffui_tray_show(t, 0);
 	return 0;
 }
@@ -457,11 +373,11 @@ int ffui_tray_create(ffui_trayicon *t, ffui_wnd *wnd)
 static void _ffui_wnd_onclose(void *a, void *b, gpointer udata)
 {
 	ffui_wnd *wnd = udata;
+	wnd->on_action(wnd, wnd->onclose_id);
 	if (wnd->hide_on_close) {
 		ffui_show(wnd, 0);
 		return;
 	}
-	wnd->on_action(wnd, wnd->onclose_id);
 }
 
 int ffui_wnd_create(ffui_wnd *w)
@@ -471,7 +387,7 @@ int ffui_wnd_create(ffui_wnd *w)
 	w->vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	gtk_container_add(GTK_CONTAINER(w->h), w->vbox);
 	g_object_set_data(G_OBJECT(w->h), "ffdata", w);
-	g_signal_connect(w->h, "delete-event", G_CALLBACK(&_ffui_wnd_onclose), w);
+	g_signal_connect(w->h, "delete-event", G_CALLBACK(_ffui_wnd_onclose), w);
 	return 0;
 }
 
@@ -548,23 +464,23 @@ static const char *const _ffui_keystr[] = {
 	"up",
 };
 
-ffui_hotkey ffui_hotkey_parse(const char *s, size_t len)
+ffui_hotkey ffui_hotkey_parse(const char *s, ffsize len)
 {
-	int r = 0, f;
-	const char *end = s + len;
-	ffstr v;
+	int r = 0;
 	enum {
 		fctrl = GDK_CONTROL_MASK << 16,
 		fshift = GDK_SHIFT_MASK << 16,
 		falt = GDK_MOD1_MASK << 16,
 	};
 
-	if (s == end)
+	ffstr v, ss = FFSTR_INITN(s, len);
+	if (!ss.len)
 		goto fail;
 
-	while (s != end) {
-		s += ffstr_nextval(s, end - s, &v, '+');
+	while (ss.len) {
+		ffstr_splitby(&ss, '+', &v, &ss);
 
+		int f;
 		if (ffstr_ieqcz(&v, "ctrl"))
 			f = fctrl;
 		else if (ffstr_ieqcz(&v, "alt"))
@@ -572,28 +488,31 @@ ffui_hotkey ffui_hotkey_parse(const char *s, size_t len)
 		else if (ffstr_ieqcz(&v, "shift"))
 			f = fshift;
 		else {
-			if (s != end)
-				goto fail; //the 2nd key is an error
+			if (ss.len)
+				goto fail; // 2nd key
 			break;
 		}
 
 		if (r & f)
-			goto fail;
+			goto fail; // duplicate key modifier
 		r |= f;
 	}
 
-	if (v.len == 1
-		&& (ffchar_isletter(v.ptr[0])
-			|| ffchar_isdigit(v.ptr[0])
-			|| v.ptr[0] == '[' || v.ptr[0] == ']'
-			|| v.ptr[0] == '`'
-			|| v.ptr[0] == '/' || v.ptr[0] == '\\'))
-		r |= v.ptr[0];
+	if (v.len == 1) {
+		int c = v.ptr[0];
+		if (((c|0x20) >= 'a' && (c|0x20) <= 'z')
+			|| (c >= '0' && c <= '9')
+			|| c == '[' || c == ']'
+			|| c == '`'
+			|| c == '/' || c == '\\')
+			r |= c;
+		else
+			goto fail; // unknown key
 
-	else {
-		ssize_t ikey = ffszarr_ifindsorted(_ffui_keystr, FF_COUNT(_ffui_keystr), v.ptr, v.len);
+	} else {
+		ffssize ikey = ffszarr_ifindsorted(_ffui_keystr, FF_COUNT(_ffui_keystr), v.ptr, v.len);
 		if (ikey == -1)
-			goto fail; //unknown key
+			goto fail; // unknown key
 		r |= _ffui_ikeys[ikey];
 	}
 
@@ -603,7 +522,7 @@ fail:
 	return 0;
 }
 
-int ffui_wnd_hotkeys(ffui_wnd *w, const ffui_wnd_hotkey *hotkeys, size_t n)
+int ffui_wnd_hotkeys(ffui_wnd *w, const ffui_wnd_hotkey *hotkeys, ffsize n)
 {
 	GtkAccelGroup *ag = gtk_accel_group_new();
 	gtk_window_add_accel_group(GTK_WINDOW(w->h), ag);
@@ -633,34 +552,21 @@ static gboolean _ffui_thd_func(gpointer data)
 	c->func(c->udata);
 	if (c->ref != 0) {
 		ffcpu_fence_release();
-		FF_WRITEONCE(c->ref, 0);
+		FFINT_WRITEONCE(c->ref, 0);
 	} else
 		ffmem_free(c);
 	return 0;
 }
 
-void ffui_thd_post(ffui_handler func, void *udata, uint id)
+void ffui_thd_post(ffui_handler func, void *udata)
 {
-	_ffui_log("func:%p  udata:%p  id:%xu", func, udata, id);
-
-	if (id & FFUI_POST_WAIT) {
-		struct cmd c;
-		c.func = func;
-		c.udata = udata;
-		c.ref = 1;
-		ffcpu_fence_release();
-
-		if (0 != gdk_threads_add_idle(&_ffui_thd_func, &c)) {
-			ffint_wait_until_equal(&c.ref, 0);
-		}
-		return;
-	}
+	_ffui_log("func:%p  udata:%p", func, udata);
 
 	struct cmd *c = ffmem_new(struct cmd);
 	c->func = func;
 	c->udata = udata;
 
-	if (0 != gdk_threads_add_idle(&_ffui_thd_func, c)) {
+	if (0 != gdk_threads_add_idle(_ffui_thd_func, c)) {
 	}
 }
 
@@ -677,76 +583,82 @@ static gboolean _ffui_send_handler(gpointer data)
 	switch ((enum FFUI_MSG)c->id) {
 
 	case FFUI_QUITLOOP:
-		ffui_quitloop();
-		break;
+		ffui_quitloop();  break;
+
+
+	case FFUI_CTL_ENABLE:
+		gtk_widget_set_sensitive(((ffui_ctl*)c->ctl)->h, (ffsize)c->udata);  break;
+
 
 	case FFUI_LBL_SETTEXT:
-		ffui_lbl_settextz((ffui_label*)c->ctl, c->udata);
-		break;
+		ffui_lbl_settextz((ffui_label*)c->ctl, c->udata);  break;
 
 	case FFUI_EDIT_GETTEXT:
-		ffui_edit_textstr((ffui_edit*)c->ctl, c->udata);
-		break;
+		ffui_edit_textstr((ffui_edit*)c->ctl, c->udata);  break;
+
+	case FFUI_STBAR_SETTEXT:
+		ffui_stbar_settextz((ffui_ctl*)c->ctl, c->udata);  break;
+
 
 	case FFUI_TEXT_SETTEXT:
 		ffui_text_clear((ffui_text*)c->ctl);
 		ffui_text_addtextstr((ffui_text*)c->ctl, (ffstr*)c->udata);
 		break;
-	case FFUI_TEXT_ADDTEXT:
-		ffui_text_addtextstr((ffui_text*)c->ctl, (ffstr*)c->udata);
-		break;
-	case FFUI_WND_SETTEXT:
-		ffui_wnd_settextz((ffui_wnd*)c->ctl, c->udata);
-		break;
-	case FFUI_CHECKBOX_SETTEXTZ:
-		ffui_checkbox_settextz((ffui_checkbox*)c->ctl, c->udata);
-		break;
-	case FFUI_WND_SHOW:
-		ffui_show((ffui_wnd*)c->ctl, (ffsize)c->udata);
-		break;
 
-	case FFUI_VIEW_RM:
-		ffui_view_rm((ffui_view*)c->ctl, c->udata);
-		break;
+	case FFUI_TEXT_ADDTEXT:
+		ffui_text_addtextstr((ffui_text*)c->ctl, (ffstr*)c->udata);  break;
+
+
+	case FFUI_CHECKBOX_SETTEXTZ:
+		ffui_checkbox_settextz((ffui_checkbox*)c->ctl, c->udata);  break;
+
+	case FFUI_CHECKBOX_CHECKED:
+		*(ffsize*)c->udata = ffui_checkbox_checked((ffui_checkbox*)c->ctl);  break;
+
+
+	case FFUI_WND_SETTEXT:
+		ffui_wnd_settextz((ffui_wnd*)c->ctl, c->udata);  break;
+
+	case FFUI_WND_SHOW:
+		ffui_show((ffui_wnd*)c->ctl, (ffsize)c->udata);  break;
+
+
 	case FFUI_VIEW_CLEAR:
-		ffui_view_clear((ffui_view*)c->ctl);
-		break;
+		ffui_view_clear((ffui_view*)c->ctl);  break;
+
 	case FFUI_VIEW_SCROLLSET:
-		ffui_view_scroll_setvert((ffui_view*)c->ctl, (size_t)c->udata);
-		break;
-	case FFUI_VIEW_GETSEL:
-		c->udata = ffui_view_getsel((ffui_view*)c->ctl);
-		break;
+		ffui_view_scroll_setvert((ffui_view*)c->ctl, (ffsize)c->udata);  break;
+
+	case FFUI_VIEW_SCROLL:
+		*(ffsize*)c->udata = ffui_view_scroll_vert((ffui_view*)c->ctl);  break;
+
 	case FFUI_VIEW_SETDATA: {
-		uint first = (size_t)c->udata >> 16;
-		uint delta = (ssize_t)c->udata & 0xffff;
+		uint first = (ffsize)c->udata >> 16;
+		uint delta = (ffssize)c->udata & 0xffff;
 		ffui_view_setdata((ffui_view*)c->ctl, first, (short)delta);
 		break;
 	}
 
+
 	case FFUI_TRK_SETRANGE:
-		ffui_trk_setrange((ffui_trkbar*)c->ctl, (size_t)c->udata);
-		break;
+		ffui_trk_setrange((ffui_trkbar*)c->ctl, (ffsize)c->udata);  break;
+
 	case FFUI_TRK_SET:
-		ffui_trk_set((ffui_trkbar*)c->ctl, (size_t)c->udata);
-		break;
+		ffui_trk_set((ffui_trkbar*)c->ctl, (ffsize)c->udata);  break;
+
 
 	case FFUI_TAB_INS:
-		ffui_tab_append((ffui_tab*)c->ctl, c->udata);
-		break;
-	case FFUI_TAB_SETACTIVE:
-		ffui_tab_setactive((ffui_tab*)c->ctl, (ffsize)c->udata);
-		break;
-	case FFUI_TAB_ACTIVE:
-		*(ffsize*)c->udata = ffui_tab_active((ffui_tab*)c->ctl);
-		break;
-	case FFUI_TAB_COUNT:
-		*(ffsize*)c->udata = ffui_tab_count((ffui_tab*)c->ctl);
-		break;
+		ffui_tab_append((ffui_tab*)c->ctl, c->udata);  break;
 
-	case FFUI_STBAR_SETTEXT:
-		ffui_stbar_settextz((ffui_ctl*)c->ctl, c->udata);
-		break;
+	case FFUI_TAB_SETACTIVE:
+		ffui_tab_setactive((ffui_tab*)c->ctl, (ffsize)c->udata);  break;
+
+	case FFUI_TAB_ACTIVE:
+		*(ffsize*)c->udata = ffui_tab_active((ffui_tab*)c->ctl);  break;
+
+	case FFUI_TAB_COUNT:
+		*(ffsize*)c->udata = ffui_tab_count((ffui_tab*)c->ctl);  break;
+
 
 	case FFUI_CLIP_SETTEXT: {
 		GtkClipboard *clip = gtk_clipboard_get(GDK_SELECTION_CLIPBOARD);
@@ -758,7 +670,7 @@ static gboolean _ffui_send_handler(gpointer data)
 
 	if (c->ref != 0) {
 		ffcpu_fence_release();
-		FF_WRITEONCE(c->ref, 0);
+		FFINT_WRITEONCE(c->ref, 0);
 	} else {
 		ffmem_free(c);
 	}
@@ -766,19 +678,16 @@ static gboolean _ffui_send_handler(gpointer data)
 }
 
 static uint quit;
-static fflock quit_lk;
 
 static int post_locked(gboolean (*func)(gpointer), void *udata)
 {
 	int r = 0;
-	fflock_lock(&quit_lk);
-	if (!quit)
+	if (!FFINT_READONCE(quit))
 		r = gdk_threads_add_idle(func, udata);
-	fflock_unlock(&quit_lk);
 	return r;
 }
 
-size_t ffui_send(void *ctl, uint id, void *udata)
+ffsize ffui_send(void *ctl, uint id, void *udata)
 {
 	_ffui_log("ctl:%p  udata:%p  id:%xu", ctl, udata, id);
 	struct cmd_send c;
@@ -794,7 +703,7 @@ size_t ffui_send(void *ctl, uint id, void *udata)
 
 	if (0 != post_locked(&_ffui_send_handler, &c)) {
 		ffint_wait_until_equal(&c.ref, 0);
-		return (size_t)c.udata;
+		return (ffsize)c.udata;
 	}
 	return 0;
 }
@@ -809,15 +718,13 @@ void ffui_post(void *ctl, uint id, void *udata)
 	ffcpu_fence_release();
 
 	if (id == FFUI_QUITLOOP) {
-		fflock_lock(&quit_lk);
-		if (0 == gdk_threads_add_idle(&_ffui_send_handler, c))
+		FFINT_WRITEONCE(quit, 1);
+		if (0 == gdk_threads_add_idle(_ffui_send_handler, c))
 			ffmem_free(c);
-		quit = 1;
-		fflock_unlock(&quit_lk);
 		return;
 	}
 
-	if (ffthread_curid() == _ffui_thd_id) {
+	if (ffthread_curid() == _ffui_thd_id && id != FFUI_VIEW_SCROLLSET) {
 		_ffui_send_handler(c);
 		return;
 	}

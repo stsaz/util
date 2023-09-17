@@ -1,5 +1,5 @@
 /** GUI-winapi: listview
-2014,2022, Simon Zolin */
+2014, Simon Zolin */
 
 #pragma once
 #include "winapi.h"
@@ -109,8 +109,16 @@ static inline void ffui_viewcol_settext(ffui_viewcol *vc, const char *text, ffsi
 	ffui_viewcol_settext_q(vc, vc->text);
 }
 
-FF_EXTERN uint ffui_viewcol_width(ffui_viewcol *vc);
-FF_EXTERN void ffui_viewcol_setwidth(ffui_viewcol *vc, uint w);
+static inline uint ffui_viewcol_width(ffui_viewcol *vc)
+{
+	return _ffui_dpi_descale(vc->col.cx);
+}
+
+static inline void ffui_viewcol_setwidth(ffui_viewcol *vc, uint w)
+{
+	vc->col.mask |= LVCF_WIDTH;
+	vc->col.cx = _ffui_dpi_scale(w);
+}
 
 /**
 'a': HDF_LEFT HDF_RIGHT HDF_CENTER */
@@ -138,7 +146,7 @@ do { \
 
 static inline void ffui_view_inscol(ffui_view *v, int pos, ffui_viewcol *vc)
 {
-	(void)ListView_InsertColumn(v->h, pos, vc);
+	ffui_ctl_send(v, LVM_INSERTCOLUMNW, pos, vc);
 	ffui_viewcol_reset(vc);
 }
 
@@ -146,30 +154,13 @@ static inline void ffui_view_inscol(ffui_view *v, int pos, ffui_viewcol *vc)
 
 static inline void ffui_view_setcol(ffui_view *v, int i, ffui_viewcol *vc)
 {
-	(void)ListView_SetColumn(v->h, i, &vc->col);
+	ffui_ctl_send(v, LVM_SETCOLUMNW, i, &vc->col);
 	ffui_viewcol_reset(vc);
-}
-
-/** Set column width */
-static inline void ffui_view_setcol_width(ffui_view *v, int i, uint width)
-{
-	ffui_viewcol vc = {};
-	ffui_viewcol_setwidth(&vc, width);
-	ffui_view_setcol(v, i, &vc);
 }
 
 static inline void ffui_view_col(ffui_view *v, int i, ffui_viewcol *vc)
 {
-	(void)ListView_GetColumn(v->h, i, &vc->col);
-}
-
-/** Get column width */
-static inline uint ffui_view_col_width(ffui_view *v, int i)
-{
-	ffui_viewcol vc = {};
-	vc.col.mask = LVCF_WIDTH;
-	ListView_GetColumn(v->h, i, &vc.col);
-	return ffui_viewcol_width(&vc);
+	ffui_ctl_send(v, LVM_GETCOLUMNW, i, &vc->col);
 }
 
 
@@ -370,7 +361,7 @@ static inline int ffui_view_ins(ffui_view *v, int pos, ffui_viewitem *it)
 {
 	it->item.iItem = pos;
 	it->item.iSubItem = 0;
-	pos = ListView_InsertItem(v->h, it);
+	pos = ffui_ctl_send(v, LVM_INSERTITEMW, 0, it);
 	ffui_view_itemreset(it);
 	return pos;
 }
@@ -383,7 +374,7 @@ static inline int ffui_view_set(ffui_view *v, int sub, ffui_viewitem *it)
 	v->check_id = 0;  v->chsel_id = 0;
 	int r;
 	it->item.iSubItem = sub;
-	r = (0 == ListView_SetItem(v->h, it));
+	r = (0 == ffui_ctl_send(v, LVM_SETITEMW, 0, it));
 	ffui_view_itemreset(it);
 	v->check_id = check_id;
 	v->chsel_id = chsel_id;
@@ -397,14 +388,16 @@ static inline int ffui_view_get(ffui_view *v, int sub, ffui_viewitem *it)
 	size_t cap = 4096;
 	it->item.iSubItem = sub;
 
-	while (ListView_GetItem(v->h, &it->item)) {
+	while (ffui_ctl_send(v, LVM_GETITEMW, 0, &it->item)) {
 
 		if (!(it->item.mask & LVIF_TEXT)
-			|| ffq_len(it->item.pszText) + 1 != (size_t)it->item.cchTextMax)
+			|| wcslen(it->item.pszText) + 1 != (size_t)it->item.cchTextMax)
 			return 0;
 
-		if (NULL == (it->w = ffmem_realloc(it->w, cap * sizeof(ffsyschar))))
+		wchar_t *p;
+		if (NULL == (p = (wchar_t*)ffmem_realloc(it->w, cap * sizeof(wchar_t))))
 			return -1;
+		it->w = p;
 		it->item.pszText = it->w;
 		it->item.cchTextMax = cap;
 		cap *= 2;
@@ -474,6 +467,7 @@ FF_EXTERN void ffui_view_edit_set(ffui_view *v, uint i, uint sub);
 
 #define ffui_view_seticonlist(v, il)  ListView_SetImageList((v)->h, (il)->h, LVSIL_SMALL)
 
+typedef LVITEMW ffui_view_disp;
 
 /** Set text on a 'dispinfo_item' object. */
 static inline void ffui_view_dispinfo_settext(LVITEMW *it, const char *text, ffsize len)
@@ -491,3 +485,61 @@ static inline void ffui_view_dispinfo_check(LVITEMW *it, int checked)
 	it->state &= ~LVIS_STATEIMAGEMASK;
 	it->state |= (checked) ? _FFUI_VIEW_CHECKED : _FFUI_VIEW_UNCHECKED;
 }
+
+
+#ifdef __cplusplus
+struct ffui_viewitemxx : ffui_viewitem {
+	ffui_viewitemxx(ffstr s) { ffmem_zero_obj(this); ffui_view_settextstr(this, &s); }
+};
+
+struct ffui_viewcolxx : ffui_viewcol {
+	uint width() { return ffui_viewcol_width(this); }
+	void width(uint val) { ffui_viewcol_setwidth(this, val); }
+};
+
+struct ffui_viewxx : ffui_view {
+	int append(ffstr text) {
+		ffui_viewitem vi = {};
+		ffui_view_settextstr(&vi, &text);
+		return ffui_view_append(this, &vi);
+	}
+	void set(int idx, int col, ffstr text) {
+		ffui_viewitem vi = {};
+		ffui_view_setindex(&vi, idx);
+		ffui_view_settextstr(&vi, &text);
+		ffui_view_set(this, col, &vi);
+	}
+	void update(uint first, int delta) {
+		uint last = first;
+		if (delta > 0) {
+			last = first + 50;
+		} else if (delta < 0) {
+			last = first + 50;
+			first = ffmax((int)first - 50, 0);
+		}
+		ffui_view_redraw(this, first, last);
+	}
+	void length(uint n, bool redraw) {
+		uint flags = (redraw) ? 0 : LVSICF_NOINVALIDATEALL | LVSICF_NOSCROLL;
+		ffui_ctl_send(this, LVM_SETITEMCOUNT, n, flags);
+	}
+	void clear() { ffui_view_clear(this); }
+	int focused() { return ffui_view_focused(this); }
+	ffslice selected() {
+		ffvec sel = {};
+		int i = -1;
+		while (-1 != (i = ffui_view_selnext(this, i))) {
+			*ffvec_pushT(&sel, uint) = i;
+		}
+		return *(ffslice*)&sel;
+	}
+	int selected_first() { return ffui_view_selnext(this, -1); }
+	ffui_viewcolxx& column(int pos, ffui_viewcolxx *vc) {
+		ffui_view_col(this, pos, vc);
+		return *vc;
+	}
+	void column(int pos, ffui_viewcol &vc) { ffui_view_setcol(this, pos, &vc); }
+	u_int scroll_vert() { return ffui_view_topindex(this); }
+	void scroll_vert(u_int val) { ffui_view_makevisible(this, val); }
+};
+#endif

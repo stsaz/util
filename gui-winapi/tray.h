@@ -1,5 +1,5 @@
 /** GUI-winapi: tray icon
-2014,2022, Simon Zolin */
+2014, Simon Zolin */
 
 #pragma once
 #include "winapi.h"

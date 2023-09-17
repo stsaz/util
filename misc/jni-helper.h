@@ -9,7 +9,7 @@ Meta:
 	jni_class jni_class_obj
 	jni_field
 String:
-	jni_js_sz
+	jni_js_sz jni_js_szf
 	jni_sz_js jni_sz_free
 Arrays:
 	jni_arr_len
@@ -19,10 +19,11 @@ Arrays:
 	jni_jsa_sza
 	jni_str_jba
 Object:
+	jni_obj_new
 	jni_obj_jo jni_obj_jo_set
-	jni_obj_sz_set
+	jni_obj_sz_set jni_obj_sz_setf
 	jni_obj_long jni_obj_long_set
-	jni_obj_int
+	jni_obj_int jni_obj_int_set
 	jni_obj_bool
 Functions:
 	jni_func jni_call_void
@@ -81,6 +82,17 @@ T: JNI_T... */
 #define jni_js_sz(sz) \
 	(*env)->NewStringUTF(env, sz)
 
+static inline jstring jni_js_szf(JNIEnv *env, const char *fmt, ...)
+{
+	va_list va;
+	va_start(va, fmt);
+	char *sz = ffsz_allocfmtv(fmt, va);
+	va_end(va);
+	jstring js = (*env)->NewStringUTF(env, sz);
+	ffmem_free(sz);
+	return js;
+}
+
 /** char* = jstring */
 #define jni_sz_js(js) \
 	(*env)->GetStringUTFChars(env, js, NULL)
@@ -137,6 +149,10 @@ static inline jobjectArray jni_jsa_sza(JNIEnv *env, char **asz, ffsize n)
 }
 
 
+/** object = new */
+#define	jni_obj_new(jc, ...) \
+	(*env)->NewObject(env, jc, __VA_ARGS__)
+
 /** obj.object = VAL */
 #define	jni_obj_jo_set(jobj, jfield, val) \
 	(*env)->SetObjectField(env, jobj, jfield, val)
@@ -153,6 +169,16 @@ static inline void jni_obj_sz_set(JNIEnv *env, jobject jo, jfieldID jf, const ch
 	jni_local_unref(js);
 }
 
+static inline void jni_obj_sz_setf(JNIEnv *env, jobject jo, jfieldID jf, const char *fmt, ...)
+{
+	va_list va;
+	va_start(va, fmt);
+	char *sz = ffsz_allocfmtv(fmt, va);
+	va_end(va);
+	jni_obj_sz_set(env, jo, jf, sz);
+	ffmem_free(sz);
+}
+
 /** long = obj.long */
 #define jni_obj_long(jobj, jfield) \
 	(*env)->GetLongField(env, jobj, jfield)
@@ -164,6 +190,10 @@ static inline void jni_obj_sz_set(JNIEnv *env, jobject jo, jfieldID jf, const ch
 /** int = obj.int */
 #define jni_obj_int(jobj, jfield) \
 	(*env)->GetIntField(env, jobj, jfield)
+
+/** obj.int = VAL */
+#define	jni_obj_int_set(jobj, jfield, val) \
+	(*env)->SetIntField(env, jobj, jfield, val)
 
 /** bool = obj.bool */
 #define jni_obj_bool(jobj, jfield) \
@@ -188,7 +218,7 @@ class C {
 	(*env)->GetStaticMethodID(env, jclazz, name, sig)
 
 #define jni_call_void(jobj, jfunc, ...) \
-	(*env)->CallVoidMethod(env, jobj, jfunc, #__VA_ARGS__)
+	(*env)->CallVoidMethod(env, jobj, jfunc, ##__VA_ARGS__)
 
 #define jni_scall_void(jobj, jfunc, ...) \
-	(*env)->CallVoidMethod(env, jobj, jfunc, #__VA_ARGS__)
+	(*env)->CallVoidMethod(env, jobj, jfunc, ##__VA_ARGS__)

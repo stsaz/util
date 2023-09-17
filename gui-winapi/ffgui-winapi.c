@@ -1,6 +1,5 @@
-/**
-Copyright (c) 2014 Simon Zolin
-*/
+/** GUI-winapi
+2014, Simon Zolin */
 
 #define COBJMACROS
 #include "winapi.h"
@@ -20,7 +19,7 @@ Copyright (c) 2014 Simon Zolin
 
 
 static uint _curthd_id; //ID of the thread running GUI message loop
-int _ffui_dpi;
+uint _ffui_dpi;
 RECT _ffui_screen_area;
 
 enum {
@@ -28,7 +27,7 @@ enum {
 };
 static uint _ffui_flags;
 
-static HWND create(enum FFUI_UID uid, const ffsyschar *text, HWND parent, const ffui_pos *r, uint style, uint exstyle, void *param);
+static HWND create(enum FFUI_UID uid, const wchar_t *text, HWND parent, const ffui_pos *r, uint style, uint exstyle, void *param);
 static int ctl_create(ffui_ctl *c, enum FFUI_UID uid, HWND parent);
 static void getpos_noscale(HWND h, ffui_pos *r);
 static int setpos_noscale(void *ctl, int x, int y, int cx, int cy, int flags);
@@ -44,32 +43,29 @@ static int process_accels(MSG *m);
 
 struct ctlinfo {
 	const char *stype;
-	const ffsyschar *sid;
+	const wchar_t *sid;
 	uint style;
 	uint exstyle;
 };
 
 static const struct ctlinfo ctls[] = {
-	{ "",	L"", 0, 0 },
-	{ "window",	L"FF_WNDCLASS", WS_CLIPCHILDREN | WS_CLIPSIBLINGS, 0 },
-	{ "label",	L"STATIC", SS_NOTIFY, 0 },
-	{ "image",	L"STATIC", SS_ICON | SS_NOTIFY, 0 },
-	{ "editbox",	L"EDIT", ES_AUTOHSCROLL | ES_AUTOVSCROLL | ES_NOHIDESEL/* | WS_TABSTOP*/
-		, WS_EX_CLIENTEDGE },
-	{ "text",	L"EDIT", ES_MULTILINE | ES_AUTOHSCROLL | ES_AUTOVSCROLL | ES_NOHIDESEL | WS_HSCROLL | WS_VSCROLL
-		, WS_EX_CLIENTEDGE },
+	{ "",			L"", 0, 0 },
+	{ "window",		L"FF_WNDCLASS", WS_CLIPCHILDREN | WS_CLIPSIBLINGS, 0 },
+	{ "label",		L"STATIC", SS_NOTIFY, 0 },
+	{ "image",		L"STATIC", SS_ICON | SS_NOTIFY, 0 },
+	{ "editbox",	L"EDIT", ES_AUTOHSCROLL | ES_AUTOVSCROLL | ES_NOHIDESEL/* | WS_TABSTOP*/, WS_EX_CLIENTEDGE },
+	{ "text",		L"EDIT", ES_MULTILINE | ES_AUTOHSCROLL | ES_AUTOVSCROLL | ES_NOHIDESEL | WS_HSCROLL | WS_VSCROLL, WS_EX_CLIENTEDGE },
 	{ "combobox",	L"COMBOBOX", CBS_DROPDOWN | CBS_AUTOHSCROLL, WS_EX_CLIENTEDGE },
-	{ "button",	L"BUTTON", 0, 0 },
+	{ "button",		L"BUTTON", 0, 0 },
 	{ "checkbox",	L"BUTTON", BS_AUTOCHECKBOX, 0 },
-	{ "radiobutton",	L"BUTTON", BS_AUTORADIOBUTTON, 0 },
+	{ "radiobutton",L"BUTTON", BS_AUTORADIOBUTTON, 0 },
 
 	{ "trackbar",	L"msctls_trackbar32", 0, 0 },
-	{ "progressbar",	L"msctls_progress32", 0, 0 },
+	{ "progressbar",L"msctls_progress32", 0, 0 },
 	{ "status_bar",	L"msctls_statusbar32", SBARS_SIZEGRIP, 0 },
 
-	{ "tab",	L"SysTabControl32", TCS_FOCUSNEVER, 0 },
-	{ "listview",	L"SysListView32", WS_BORDER | LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS
-		| LVS_AUTOARRANGE | LVS_SHAREIMAGELISTS, 0 },
+	{ "tab",		L"SysTabControl32", TCS_FOCUSNEVER, 0 },
+	{ "listview",	L"SysListView32", WS_BORDER | LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_AUTOARRANGE | LVS_SHAREIMAGELISTS, 0 },
 	{ "treeview",	L"SysTreeView32", WS_BORDER | TVS_SHOWSELALWAYS | TVS_INFOTIP, 0 },
 };
 
@@ -85,6 +81,7 @@ int ffui_init(void)
 
 	CoInitializeEx(NULL, 0);
 	ffui_screenarea(&_ffui_screen_area);
+	ffui_wnd_initstyle();
 	return 0;
 }
 
@@ -239,21 +236,10 @@ int ffui_hotkey_register(void *ctl, ffui_hotkey hk)
 	return id;
 }
 
-void ffui_hotkey_unreg(void *ctl, int id)
-{
-	ffui_ctl *c = ctl;
-	UnregisterHotKey(c->h, id);
-	GlobalDeleteAtom(id);
-}
-
-
-#define dpi_descale(x)  (((x) * 96) / _ffui_dpi)
-#define dpi_scale(x)  (((x) * _ffui_dpi) / 96)
-
 
 int ffui_iconlist_create(ffui_iconlist *il, uint width, uint height)
 {
-	if (NULL == (il->h = ImageList_Create(dpi_scale(width), dpi_scale(height), ILC_MASK | ILC_COLOR32, 1, 0)))
+	if (NULL == (il->h = ImageList_Create(_ffui_dpi_scale(width), _ffui_dpi_scale(height), ILC_MASK | ILC_COLOR32, 1, 0)))
 		return -1;
 	return 0;
 }
@@ -281,12 +267,6 @@ void ffui_font_set(ffui_font *fnt, const ffstr *name, int height, uint flags)
 static int setpos_noscale(void *ctl, int x, int y, int cx, int cy, int flags)
 {
 	return !SetWindowPos(((ffui_ctl*)ctl)->h, HWND_TOP, x, y, cx, cy, SWP_NOACTIVATE | flags);
-}
-
-int ffui_setpos(void *ctl, int x, int y, int cx, int cy, int flags)
-{
-	return !SetWindowPos(((ffui_ctl*)ctl)->h, HWND_TOP, dpi_scale(x), dpi_scale(y)
-		, dpi_scale(cx), dpi_scale(cy), SWP_NOACTIVATE | flags);
 }
 
 static void getpos_noscale(HWND h, ffui_pos *r)
@@ -321,18 +301,18 @@ void ffui_getpos2(void *ctl, ffui_pos *r, uint flags)
 		ffui_pos_fromrect(r, &rect);
 	}
 	if (flags & FFUI_FPOS_DPISCALE) {
-		ffui_dpi_descalepos(r);
+		_ffui_dpi_descalepos(r);
 	}
 }
 
-static HWND create(enum FFUI_UID uid, const ffsyschar *text, HWND parent, const ffui_pos *r, uint style, uint exstyle, void *param)
+static HWND create(enum FFUI_UID uid, const wchar_t *text, HWND parent, const ffui_pos *r, uint style, uint exstyle, void *param)
 {
 	HINSTANCE inst = NULL;
 	if (uid == FFUI_UID_WINDOW)
 		inst = GetModuleHandleW(NULL);
 
 	return CreateWindowExW(exstyle, ctls[uid].sid, text, style
-		, dpi_scale(r->x), dpi_scale(r->y), dpi_scale(r->cx), dpi_scale(r->cy)
+		, _ffui_dpi_scale(r->x), _ffui_dpi_scale(r->y), _ffui_dpi_scale(r->cx), _ffui_dpi_scale(r->cy)
 		, parent, NULL, inst, param);
 }
 
@@ -363,6 +343,33 @@ int ffui_ctl_destroy(void *_c)
 	if (c->h != NULL)
 		r = !DestroyWindow(c->h);
 	return r;
+}
+
+int ffui_textstr(void *_c, ffstr *dst)
+{
+	ffui_ctl *c = _c;
+	wchar_t ws[255], *w = ws;
+	ffsize len = ffui_send(c->h, WM_GETTEXTLENGTH, 0, 0);
+
+	if (len >= FF_COUNT(ws)
+		&& NULL == (w = ffws_alloc(len + 1)))
+		goto fail;
+	ffui_send(c->h, WM_GETTEXT, len + 1, w);
+
+	dst->len = ff_wtou(NULL, 0, w, len, 0);
+	if (NULL == (dst->ptr = ffmem_alloc(dst->len + 1)))
+		goto fail;
+
+	ff_wtou(dst->ptr, dst->len + 1, w, len + 1, 0);
+	if (w != ws)
+		ffmem_free(w);
+	return (int)dst->len;
+
+fail:
+	if (w != ws)
+		ffmem_free(w);
+	dst->len = 0;
+	return -1;
 }
 
 
@@ -424,20 +431,18 @@ static LRESULT __stdcall _ffui_ctl_proc(HWND h, uint msg, WPARAM w, LPARAM l)
 
 const char* ffui_fdrop_next(ffui_fdrop *df)
 {
-	uint nbuf;
+	uint n = DragQueryFileW(df->hdrop, df->idx, NULL, 0);
+	if (n == 0)
+		return NULL;
+	n++;
+
 	wchar_t *w, ws[255];
-
-	nbuf = DragQueryFileW(df->hdrop, df->idx, NULL, 0);
-	if (nbuf == 0)
-		return NULL;
-	nbuf++;
-
-	if (nbuf < FF_COUNT(ws))
+	if (n < FF_COUNT(ws))
 		w = ws;
-	else if (NULL == (w = ffws_alloc(nbuf)))
+	else if (NULL == (w = ffws_alloc(n)))
 		return NULL;
 
-	DragQueryFileW(df->hdrop, df->idx++, w, nbuf);
+	DragQueryFileW(df->hdrop, df->idx++, w, n);
 
 	ffmem_free(df->fn);
 	df->fn = ffsz_alloc_wtou(w);
@@ -483,7 +488,7 @@ int ffui_lbl_create(ffui_label *c, ffui_wnd *parent)
 }
 
 
-int ffui_img_create(ffui_img *im, ffui_wnd *parent)
+int ffui_img_create(ffui_image *im, ffui_wnd *parent)
 {
 	if (0 != ctl_create((void*)im, FFUI_UID_IMAGE, parent->h))
 		return 1;
@@ -524,6 +529,32 @@ int ffui_combx_create(ffui_ctl *c, ffui_wnd *parent)
 		ffui_ctl_send(c, WM_SETFONT, parent->font, 0);
 
 	return 0;
+}
+
+int ffui_combx_textstr(ffui_combx *c, uint idx, ffstr *dst)
+{
+	ffsize len = ffui_send(c->h, CB_GETLBTEXTLEN, idx, 0);
+	wchar_t ws[255], *w = ws;
+
+	if (len >= FF_COUNT(ws)
+		&& NULL == (w = ffws_alloc(len + 1)))
+		goto fail;
+	ffui_send(c->h, CB_GETLBTEXT, idx, w);
+
+	dst->len = ff_wtou(NULL, 0, w, len, 0);
+	if (NULL == (dst->ptr = ffmem_alloc(dst->len + 1)))
+		goto fail;
+
+	ff_wtou(dst->ptr, dst->len + 1, w, len + 1, 0);
+	if (w != ws)
+		ffmem_free(w);
+	return (int)dst->len;
+
+fail:
+	if (w != ws)
+		ffmem_free(w);
+	dst->len = 0;
+	return -1;
 }
 
 
@@ -611,18 +642,6 @@ int ffui_view_itempos(ffui_view *v, uint idx, ffui_pos *pos)
 	return ret;
 }
 
-uint ffui_viewcol_width(ffui_viewcol *vc)
-{
-	return dpi_descale(vc->col.cx);
-}
-
-void ffui_viewcol_setwidth(ffui_viewcol *vc, uint w)
-{
-	vc->col.mask |= LVCF_WIDTH;
-	vc->col.cx = dpi_scale(w);
-}
-
-
 int ffui_view_search(ffui_view *v, size_t by)
 {
 	ffui_viewitem it = {};
@@ -684,41 +703,6 @@ int ffui_view_edit_hittest(ffui_view *v, uint sub)
 }
 
 
-uint ffui_dpi()
-{
-	return _ffui_dpi;
-}
-
-void ffui_dpi_set(uint dpi)
-{
-	_ffui_dpi = dpi;
-}
-
-int ffui_dpi_scale(int x)
-{
-	return dpi_scale(x);
-}
-int ffui_dpi_descale(int x)
-{
-	return dpi_descale(x);
-}
-
-void ffui_dpi_scalepos(ffui_pos *r)
-{
-	r->x = dpi_scale(r->x);
-	r->y = dpi_scale(r->y);
-	r->cx = dpi_scale(r->cx);
-	r->cy = dpi_scale(r->cy);
-}
-
-void ffui_dpi_descalepos(ffui_pos *r)
-{
-	r->x = dpi_descale(r->x);
-	r->y = dpi_descale(r->y);
-	r->cx = dpi_descale(r->cx);
-	r->cy = dpi_descale(r->cy);
-}
-
 void ffui_pos_limit(ffui_pos *r, const ffui_pos *screen)
 {
 	if (r->x < 0)
@@ -740,7 +724,7 @@ void ffui_pos_limit(ffui_pos *r, const ffui_pos *screen)
 }
 
 
-int ffui_icon_load_q(ffui_icon *ico, const ffsyschar *filename, uint index, uint flags)
+int ffui_icon_load_q(ffui_icon *ico, const wchar_t *filename, uint index, uint flags)
 {
 	HICON *big = NULL, *small = NULL;
 	if (flags & FFUI_ICON_SMALL)
@@ -752,7 +736,7 @@ int ffui_icon_load_q(ffui_icon *ico, const ffsyschar *filename, uint index, uint
 
 int ffui_icon_load(ffui_icon *ico, const char *filename, uint index, uint flags)
 {
-	ffsyschar *w, ws[255];
+	wchar_t *w, ws[255];
 	size_t n = FF_COUNT(ws) - 1;
 	int r;
 	if (NULL == (w = ffs_utow(ws, &n, filename, ffsz_len(filename))))
@@ -764,11 +748,11 @@ int ffui_icon_load(ffui_icon *ico, const char *filename, uint index, uint flags)
 	return r;
 }
 
-int ffui_icon_loadimg_q(ffui_icon *ico, const ffsyschar *filename, uint cx, uint cy, uint flags)
+int ffui_icon_loadimg_q(ffui_icon *ico, const wchar_t *filename, uint cx, uint cy, uint flags)
 {
 	if (flags & FFUI_ICON_DPISCALE) {
-		cx = dpi_scale(cx);
-		cy = dpi_scale(cy);
+		cx = _ffui_dpi_scale(cx);
+		cy = _ffui_dpi_scale(cy);
 	}
 	ico->h = LoadImageW(NULL, filename, IMAGE_ICON, cx, cy, LR_LOADFROMFILE);
 	return (ico->h == NULL);
@@ -776,7 +760,7 @@ int ffui_icon_loadimg_q(ffui_icon *ico, const ffsyschar *filename, uint cx, uint
 
 int ffui_icon_loadimg(ffui_icon *ico, const char *filename, uint cx, uint cy, uint flags)
 {
-	ffsyschar *w, ws[255];
+	wchar_t *w, ws[255];
 	size_t n = FF_COUNT(ws) - 1;
 	int r;
 	if (NULL == (w = ffs_utow(ws, &n, filename, ffsz_len(filename))))
@@ -790,7 +774,7 @@ int ffui_icon_loadimg(ffui_icon *ico, const char *filename, uint cx, uint cy, ui
 
 int ffui_icon_loadstd(ffui_icon *ico, uint tag)
 {
-	const ffsyschar *fn;
+	const wchar_t *fn;
 	uint type = tag & ~0xffff, n = (tag & 0xffff);
 
 	switch (type) {
@@ -807,10 +791,10 @@ int ffui_icon_loadstd(ffui_icon *ico, uint tag)
 	return ffui_icon_load_q(ico, fn, n, 0);
 }
 
-int ffui_icon_loadres(ffui_icon *ico, const ffsyschar *name, uint cx, uint cy)
+int ffui_icon_loadres(ffui_icon *ico, const wchar_t *name, uint cx, uint cy)
 {
 	uint f = (cx == 0 && cy == 0) ? LR_DEFAULTSIZE : 0;
-	ico->h = LoadImageW(GetModuleHandleW(NULL), name, IMAGE_ICON, dpi_scale(cx), dpi_scale(cy), f);
+	ico->h = LoadImageW(GetModuleHandleW(NULL), name, IMAGE_ICON, _ffui_dpi_scale(cx), _ffui_dpi_scale(cy), f);
 	return (ico->h == NULL);
 }
 
@@ -1094,10 +1078,8 @@ void ffui_thd_post(ffui_handler func, void *udata)
 }
 
 
-#define dpi_scale(x)  (((x) * _ffui_dpi) / 96)
-
 static void print(const char *cmd, HWND h, size_t w, size_t l) {
-	_ffui_log("%s:\th: %8xL,  w: %8xL,  l: %8xL\n"
+	_ffui_log("%s:\th: %8xL,  w: %8xL,  l: %8xL"
 		, cmd, (void*)h, (size_t)w, (size_t)l);
 }
 
@@ -1126,7 +1108,7 @@ static void tray_nfy(ffui_wnd *wnd, ffui_trayicon *t, size_t l)
 	}
 }
 
-static void wnd_bordstick(uint stick, WINDOWPOS *ws)
+static void wnd_border_stick(uint stick, WINDOWPOS *ws)
 {
 	RECT r = _ffui_screen_area;
 	if (stick >= (uint)ffint_abs(r.left - ws->x))
@@ -1518,7 +1500,7 @@ int ffui_wndproc(ffui_wnd *wnd, size_t *code, HWND h, uint msg, size_t w, size_t
 	case WM_WINDOWPOSCHANGING:
 		// print("WM_WINDOWPOSCHANGING", h, w, l);
 		if (wnd->bordstick != 0) {
-			wnd_bordstick(dpi_scale(wnd->bordstick), (WINDOWPOS *)l);
+			wnd_border_stick(_ffui_dpi_scale(wnd->bordstick), (WINDOWPOS *)l);
 			return 0;
 		}
 		break;
@@ -1565,10 +1547,9 @@ int ffui_wndproc(ffui_wnd *wnd, size_t *code, HWND h, uint msg, size_t w, size_t
 	case WM_DROPFILES:
 		print("WM_DROPFILES", h, w, l);
 		if (wnd->on_dropfiles != NULL) {
-			ffui_fdrop d;
-			d.hdrop = (void*)w;
-			d.idx = 0;
-			d.fn = NULL;
+			ffui_fdrop d = {
+				.hdrop = (void*)w,
+			};
 			wnd->on_dropfiles(wnd, &d);
 			ffmem_free(d.fn);
 		}
@@ -1598,7 +1579,7 @@ int ffui_wndproc(ffui_wnd *wnd, size_t *code, HWND h, uint msg, size_t w, size_t
 			wnd->on_destroy(wnd);
 
 		if (top)
-			ffui_quitloop();
+			ffui_post_quitloop();
 		break;
 	}
 	}

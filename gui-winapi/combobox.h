@@ -22,7 +22,7 @@ FF_EXTERN int ffui_combx_create(ffui_ctl *c, ffui_wnd *parent);
 idx: -1: insert to end */
 static inline void ffui_combx_ins(ffui_combx *c, int idx, const char *txt, ffsize len)
 {
-	ffsyschar *w, ws[255];
+	wchar_t *w, ws[255];
 	ffsize n = FF_COUNT(ws) - 1;
 	if (NULL == (w = ffs_utow(ws, &n, txt, len)))
 		return;
@@ -52,31 +52,7 @@ static inline void ffui_combx_ins(ffui_combx *c, int idx, const char *txt, ffsiz
 #define ffui_combx_active(c)  ((uint)ffui_ctl_send(c, CB_GETCURSEL, 0, 0))
 
 /** Get text */
-static inline int ffui_combx_textstr(ffui_combx *c, uint idx, ffstr *dst)
-{
-	ffsize len = ffui_send(c->h, CB_GETLBTEXTLEN, idx, 0);
-	ffsyschar ws[255], *w = ws;
-
-	if (len >= FF_COUNT(ws)
-		&& NULL == (w = ffws_alloc(len + 1)))
-		goto fail;
-	ffui_send(c->h, CB_GETLBTEXT, idx, w);
-
-	dst->len = ff_wtou(NULL, 0, w, len, 0);
-	if (NULL == (dst->ptr = ffmem_alloc(dst->len + 1)))
-		goto fail;
-
-	ff_wtou(dst->ptr, dst->len + 1, w, len + 1, 0);
-	if (w != ws)
-		ffmem_free(w);
-	return (int)dst->len;
-
-fail:
-	if (w != ws)
-		ffmem_free(w);
-	dst->len = 0;
-	return -1;
-}
+FF_EXTERN int ffui_combx_textstr(ffui_combx *c, uint idx, ffstr *dst);
 
 /** Show/hide drop down list */
 #define ffui_combx_popup(c, show)  ffui_ctl_send(c, CB_SHOWDROPDOWN, show, 0)

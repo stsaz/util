@@ -1,5 +1,5 @@
 /** GUI-winapi: treeview
-2014,2022, Simon Zolin */
+2014, Simon Zolin */
 
 #pragma once
 #include "view.h"
@@ -77,7 +77,7 @@ do { \
 
 static inline void* ffui_tree_ins(ffui_view *v, void *parent, void *after, ffui_tvitem *it)
 {
-	TVINSERTSTRUCTW ins = { 0 };
+	TVINSERTSTRUCTW ins = {};
 	ins.hParent = (HTREEITEM)parent;
 	ins.hInsertAfter = (HTREEITEM)after;
 	ins.item = it->ti;
@@ -89,7 +89,7 @@ static inline void* ffui_tree_ins(ffui_view *v, void *parent, void *after, ffui_
 
 #define ffui_tree_remove(t, item)  ffui_ctl_send(t, TVM_DELETEITEM, 0, item)
 
-static inline void ffui_tree_get(ffui_view *v, void *pitem, ffui_tvitem *it)
+static inline void ffui_tree_get(ffui_view *v, HTREEITEM pitem, ffui_tvitem *it)
 {
 	it->ti.hItem = pitem;
 	ffui_send(v->h, TVM_GETITEM, 0, &it->ti);
@@ -97,7 +97,7 @@ static inline void ffui_tree_get(ffui_view *v, void *pitem, ffui_tvitem *it)
 
 static inline char* ffui_tree_text(ffui_view *t, void *item)
 {
-	ffsyschar buf[255];
+	wchar_t buf[255];
 	TVITEMW it = {};
 	it.mask = TVIF_TEXT;
 	it.pszText = buf;

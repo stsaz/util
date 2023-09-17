@@ -1,5 +1,5 @@
 /** GUI-winapi: editbox
-2014,2022, Simon Zolin */
+2014, Simon Zolin */
 
 #pragma once
 #include "winapi.h"
@@ -31,7 +31,7 @@ static inline ffstr ffui_edit_text(ffui_edit *e)
 
 static inline int ffui_edit_addtext(ffui_edit *c, const char *text, size_t len)
 {
-	ffsyschar *w, ws[255];
+	wchar_t *w, ws[255];
 	ffsize n = FF_COUNT(ws) - 1;
 	if (NULL == (w = ffs_utow(ws, &n, text, len)))
 		return -1;
@@ -63,3 +63,13 @@ enum FFUI_EDIT_SCROLL {
 /*
 type: enum FFUI_EDIT_SCROLL */
 #define ffui_edit_scroll(e, type)  ffui_send((e)->h, EM_SCROLL, type, 0)
+
+
+#ifdef __cplusplus
+struct ffui_editxx : ffui_edit {
+	void text(const char *sz) { ffui_settextz(this, sz); }
+	void text(ffstr s) { ffui_settext(this, s.ptr, s.len); }
+	ffstr text() { ffstr s = {}; ffui_textstr(this, &s); return s; }
+	void focus() { SetFocus(h); }
+};
+#endif

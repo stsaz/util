@@ -21,7 +21,7 @@ static inline void ffui_dlg_init(ffui_dialog *d)
 static inline void ffui_dlg_destroy(ffui_dialog *d)
 {
 	g_slist_free_full(d->names, g_free);  d->names = NULL;
-	ffmem_free0(d->title);
+	ffmem_free(d->title); d->title = NULL;
 	g_free(d->name); d->name = NULL;
 }
 
@@ -71,7 +71,7 @@ static inline char* ffui_dlg_open(ffui_dialog *d, ffui_wnd *parent)
 	return d->name;
 }
 
-static inline char* ffui_dlg_save(ffui_dialog *d, ffui_wnd *parent, const char *fn, size_t fnlen)
+static inline char* ffui_dlg_save(ffui_dialog *d, ffui_wnd *parent, const char *fn, ffsize fnlen)
 {
 	g_free(d->name);  d->name = NULL;
 

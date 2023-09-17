@@ -1,6 +1,5 @@
-/** GUI loader.
-Copyright (c) 2014 Simon Zolin
-*/
+/** GUI-winapi loader.
+2014, Simon Zolin */
 
 #pragma once
 #include "winapi.h"
@@ -13,8 +12,7 @@ Copyright (c) 2014 Simon Zolin
 #include "tree.h"
 #include "view.h"
 #include "window.h"
-#include "../conf2-scheme.h"
-#include "../conf2-writer.h"
+#include "../conf-scheme.h"
 #include "../gui-vars.h"
 
 
@@ -95,14 +93,12 @@ struct ffui_loader {
 	uint style_reset :1;
 };
 
-FF_EXTERN void ffui_ldr_init(ffui_loader *g);
-
 /** Initialize GUI loader.
 getctl: get a pointer to a UI element by its name.
  Most of the time you just need to call ffui_ldr_findctl() from it.
 getcmd: get command ID by its name
 udata: user data */
-FF_EXTERN void ffui_ldr_init2(ffui_loader *g, ffui_ldr_getctl_t getctl, ffui_ldr_getcmd_t getcmd, void *udata);
+FF_EXTERN void ffui_ldr_init(ffui_loader *g, ffui_ldr_getctl_t getctl, ffui_ldr_getcmd_t getcmd, void *udata);
 
 FF_EXTERN void ffui_ldr_fin(ffui_loader *g);
 
@@ -110,8 +106,6 @@ FF_EXTERN void ffui_ldr_fin(ffui_loader *g);
 
 /** Load GUI from file. */
 FF_EXTERN int ffui_ldr_loadfile(ffui_loader *g, const char *fn);
-
-FF_EXTERN void ffui_ldr_loadconf(ffui_loader *g, const char *fn, ffuint64 file_max_size);
 
 
 typedef struct ffui_ldr_ctl ffui_ldr_ctl;
@@ -134,24 +128,3 @@ struct ffui_ldr_ctl {
 /** Find control by its name in structured hierarchy.
 @name: e.g. "window.control" */
 FF_EXTERN void* ffui_ldr_findctl(const ffui_ldr_ctl *ctx, void *ctl, const ffstr *name);
-
-
-typedef struct ffui_loaderw {
-	ffui_ldr_getctl_t getctl;
-	void *udata;
-
-	ffconfw confw;
-	uint fin :1;
-} ffui_loaderw;
-
-FF_EXTERN void ffui_ldrw_fin(ffui_loaderw *ldr);
-
-FF_EXTERN void ffui_ldr_setv(ffui_loaderw *ldr, const char *const *names, size_t n, uint flags);
-
-enum FFUI_LDR_F {
-	FFUI_LDR_FSTR = 1,
-};
-
-FF_EXTERN void ffui_ldr_set(ffui_loaderw *ldr, const char *name, const char *val, size_t len, uint flags);
-
-FF_EXTERN int ffui_ldr_write(ffui_loaderw *ldr, const char *fn);

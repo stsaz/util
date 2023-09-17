@@ -24,6 +24,8 @@ else
 endif
 CFLAGS += -std=gnu99
 
+%.o: $(UTIL_DIR)/data/%.c
+	$(C) $(CFLAGS) $< -o $@
 %.o: $(UTIL_DIR)/net/%.c
 	$(C) $(CFLAGS) $< -o $@
 %.o: $(UTIL_DIR)/%.c
