@@ -2,17 +2,21 @@
 2022, Simon Zolin */
 
 #pragma once
-#include <FFOS/file.h>
-#include <FFOS/std.h>
-#include <FFOS/thread.h> // optional
+#include <ffsys/file.h>
+#include <ffsys/std.h>
+#include <ffsys/thread.h> // optional
+
+typedef void (*zzlog_func)(ffstr s);
 
 struct zzlog {
+	zzlog_func func;
 	fffd fd;
+
 	char date[32];
 	char levels[10][8];
 	char colors[10][8];
 	ffuint use_color :1;
-	ffuint fd_file :1;
+	ffuint fd_file :1; // Windows: fd is a regular file, not console
 };
 
 #define ZZLOG_SYS_ERROR  0x10
@@ -27,7 +31,7 @@ static inline void zzlog_printv(struct zzlog *l, ffuint flags, const char *ctx, 
 	ffuint level = flags & 0x0f;
 	char buffer[4*1024];
 	char *d = buffer;
-	ffsize r = 0, cap = sizeof(buffer) - 2;
+	ffsize r = 0, cap = sizeof(buffer) - 10;
 
 	const char *color_end = "";
 	if (l->use_color) {
@@ -69,8 +73,9 @@ static inline void zzlog_printv(struct zzlog *l, ffuint flags, const char *ctx, 
 	r += r2;
 
 	if (flags & ZZLOG_SYS_ERROR) {
+		int e = fferr_last();
 		r += ffs_format_r0(&d[r], cap - r, ": (%u) %s"
-			, fferr_last(), fferr_strptr(fferr_last()));
+			, e, fferr_strptr(e));
 	}
 
 	r += _ffs_copyz(&d[r], cap - r, color_end);
@@ -79,6 +84,12 @@ static inline void zzlog_printv(struct zzlog *l, ffuint flags, const char *ctx, 
 	d[r++] = '\r';
 #endif
 	d[r++] = '\n';
+
+	if (l->func) {
+		ffstr s = FFSTR_INITN(d, r);
+		l->func(s);
+		return;
+	}
 
 #ifdef FF_WIN
 	if (!l->fd_file) {

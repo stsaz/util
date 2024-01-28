@@ -5,14 +5,14 @@ UTIL_DIR := $(ROOT)/util
 FFOS_DIR := $(ROOT)/ffos
 FFBASE_DIR := $(ROOT)/ffbase
 
-include $(FFBASE_DIR)/test/makeconf
+include $(FFBASE_DIR)/conf.mk
 
 OBJ := \
 	test.o \
 	test-ipaddr.o
 
 utiltest: $(OBJ)
-	$(LINK) $(LINKFLAGS) $+ -o $@
+	$(LINK) $+ $(LINKFLAGS) -o $@
 
 CFLAGS := -I$(UTIL_DIR) -I$(FFOS_DIR) -I$(FFBASE_DIR) \
 	-Wall -Wextra \
@@ -30,3 +30,11 @@ CFLAGS += -std=gnu99
 	$(C) $(CFLAGS) $< -o $@
 %.o: $(UTIL_DIR)/%.c
 	$(C) $(CFLAGS) $< -o $@
+
+ffssl.o: $(UTIL_DIR)/net/ffssl.c
+	$(C) $(CFLAGS) -Wno-deprecated-declarations -Wno-unused-parameter $< -o $@
+test-ssl.o: $(UTIL_DIR)/net/test-ssl.c
+	$(C) $(CFLAGS) -Wno-deprecated-declarations $< -o $@
+test-ssl: test-ssl.o \
+		ffssl.o
+	$(LINK) $+ $(LINKFLAGS) -L_$(OS)-amd64 -lcrypto -lssl -o $@

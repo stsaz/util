@@ -20,12 +20,13 @@ System:
 	sys/woeh.h              Windows object handler - call a user function when a kernel object signals.
 
 Data:
+
 	data/cmdarg-scheme.h    command-line arguments parser with scheme
 	data/cmdarg.h           command-line arguments parser
 	data/conf-args.h        ffconf-ffargs bridge
 	data/conf-obj.h         ffconf extension: `object {...}`; partial input
 	data/conf-scheme.h      configuration parser with scheme
-	data/conf2-writer.h     ffbase: conf writer
+	data/conf-write.h       conf writer
 	data/conf2.h            configuration parser
 	data/fntree.h           File name tree with economical memory management.
 	data/html.h             HTML parser
@@ -45,6 +46,7 @@ Network:
 	net/intel-dpdk.h    Intel DPDK wrapper
 	net/ipaddr.h        IPv4 address
 	net/socks.h         SOCKS4
+	net/ssl.h           OpenSSL wrapper
 	net/tls.h           TLS reader
 	net/url.h
 	net/websocket.h     WebSocket reader/writer
@@ -54,20 +56,6 @@ DB:
 	db/db.h
 	db/postgre.h        PostgreSQL libpq wrapper
 	db/sqlite.h         SQLite wrapper
-
-GUI:
-
-	gui-gtk/ffgui-gtk-loader.c
-	gui-gtk/ffgui-gtk.c
-	gui-gtk/gtk.h                   GUI based on GTK+
-	gui-gtk/loader.h                GUI based on GTK+
-	gui-gtk/unix-shell.h            UNIX shell utils
-	gui-vars.h                      GUI variables
-	gui-winapi/ffgui-winapi-loader.c
-	gui-winapi/ffgui-winapi.c
-	gui-winapi/loader.h             GUI loader
-	gui-winapi/winapi-shell.h
-	gui-winapi/winapi.h             GUI based on Windows API
 
 Unsorted:
 

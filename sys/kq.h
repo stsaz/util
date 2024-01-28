@@ -11,8 +11,8 @@ zzkq_attach
 */
 
 #pragma once
-#include <FFOS/queue.h>
-#include <FFOS/kcall.h>
+#include <ffsys/queue.h>
+#include <ffsys/kcall.h>
 
 typedef void (*zzkevent_func)(void *obj);
 struct zzkevent {
@@ -22,7 +22,7 @@ struct zzkevent {
 		ffkq_task_accept rtask_accept;
 	};
 	ffkq_task wtask;
-	ffuint side;
+	uint side;
 	void *obj;
 	struct zzkevent *prev_kev;
 	struct ffkcall kcall;
@@ -33,18 +33,19 @@ struct zzkevent {
 // #define ZZKQ_LOG_SYSERR  ?
 // #define ZZKQ_LOG_ERR  ?
 // #define ZZKQ_LOG_DEBUG  ?
+// Optional:
 // #define ZZKQ_LOG_EXTRA  ?
 
 #define zzkq_syserrlog(k, ...) \
-	k->conf.log(k->conf.log_obj, ZZKQ_LOG_SYSERR, k->conf.log_ctx, NULL, __VA_ARGS__)
+	k->conf.log.func(k->conf.log.obj, ZZKQ_LOG_SYSERR, k->conf.log.ctx, NULL, __VA_ARGS__)
 
 #define zzkq_errlog(k, ...) \
-	k->conf.log(k->conf.log_obj, ZZKQ_LOG_ERR, k->conf.log_ctx, NULL, __VA_ARGS__)
+	k->conf.log.func(k->conf.log.obj, ZZKQ_LOG_ERR, k->conf.log.ctx, NULL, __VA_ARGS__)
 
 #define zzkq_dbglog(k, ...) \
 do { \
-	if (k->conf.log_level >= ZZKQ_LOG_DEBUG) \
-		k->conf.log(k->conf.log_obj, ZZKQ_LOG_DEBUG, k->conf.log_ctx, NULL, __VA_ARGS__); \
+	if (k->conf.log.level >= ZZKQ_LOG_DEBUG) \
+		k->conf.log.func(k->conf.log.obj, ZZKQ_LOG_DEBUG, k->conf.log.ctx, NULL, __VA_ARGS__); \
 } while (0)
 
 #define zzkq_extralog(k, ...)
@@ -52,23 +53,23 @@ do { \
 	#undef zzkq_extralog
 	#define zzkq_extralog(k, ...) \
 	do { \
-		if (k->conf.log_level >= ZZKQ_LOG_DEBUG) \
-			k->conf.log(k->conf.log_obj, ZZKQ_LOG_EXTRA, k->conf.log_ctx, NULL, __VA_ARGS__); \
+		if (k->conf.log.level >= ZZKQ_LOG_DEBUG) \
+			k->conf.log.func(k->conf.log.obj, ZZKQ_LOG_EXTRA, k->conf.log.ctx, NULL, __VA_ARGS__); \
 	} while (0)
 #endif
 
-
-typedef void (*log_print_func)(void *log_obj, ffuint flags, const char *ctx, const char *id, const char *fmt, ...);
+struct zzkq_conf_log {
+	ffuint level;
+	void (*func)(void *obj, ffuint flags, const char *ctx, phi_track *trk, const char *fmt, ...);
+	void *obj;
+	const char *ctx;
+};
 
 struct zzkq_conf {
-	ffuint log_level;
-	log_print_func log;
-	void *log_obj;
-	const char *log_ctx;
-
-	ffuint max_objects;
-	ffuint events_wait;
-	ffuint polling_mode :1;
+	struct zzkq_conf_log log;
+	uint max_objects;
+	uint events_wait;
+	uint polling_mode :1;
 };
 
 struct zzkq {
@@ -76,11 +77,11 @@ struct zzkq {
 
 	fffd kq;
 	ffkq_event *events;
-	ffuint stop;
+	uint stop;
 
 	struct zzkevent *kevs;
 	struct zzkevent *kevs_unused_lifo;
-	ffuint kevs_allocated, kevs_locked;
+	uint kevs_allocated, kevs_locked;
 
 	struct zzkevent post_kev;
 	ffkq_postevent kqpost;
@@ -191,7 +192,7 @@ static inline int zzkq_attach(struct zzkq *k, fffd fd, struct zzkevent *kev, uin
 
 static void _zzkq_kev_call(struct zzkq *k, struct zzkevent *kev, ffkq_event *ev)
 {
-	ffuint flags = ffkq_event_flags(ev);
+	uint flags = ffkq_event_flags(ev);
 
 #ifdef FF_WIN
 	flags = FFKQ_READ;
@@ -200,7 +201,7 @@ static void _zzkq_kev_call(struct zzkq *k, struct zzkevent *kev, ffkq_event *ev)
 #endif
 
 	zzkq_extralog(k, "%p #%D f:%xu r:%d w:%d"
-		, kev, (kev > k->kevs) ? (ffuint64)(kev - k->kevs) : ~0ULL, flags, kev->rtask.active, kev->wtask.active);
+		, kev, (kev > k->kevs) ? (ffint64)(kev - k->kevs) : -1LL, flags, kev->rtask.active, kev->wtask.active);
 
 	if ((flags & FFKQ_READ) && kev->rtask.active) {
 		ffkq_task_event_assign(&kev->rtask, ev);

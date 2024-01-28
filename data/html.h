@@ -46,11 +46,11 @@ int htmlread_process(htmlread *h, ffstr *in, ffstr *out)
 		I_WSPACE, I_ATTR, I_ATTR_EQ, I_ATTRVAL, I_ANGL_R,
 	};
 	int c;
-	ffssize i;
-	ffstr s;
+	ffssize i = 0;
 
 	for (;;) {
 		switch (h->state) {
+
 		case I_TEXT: // return all text until next '<'
 			if (h->out_preserve)
 				h->out_preserve = 0;
@@ -162,14 +162,14 @@ int htmlread_process(htmlread *h, ffstr *in, ffstr *out)
 
 		case I_ATTRVAL: // "<tag attr=": return attribute value
 			if (!(in->ptr[0] == '"' || in->ptr[0] == '\'')) {
-				//@
+				//TODO
 				// h->state = I_ATTR;
 				continue;
 			}
 
 			if (0 > (i = ffs_findany(in->ptr + 1, in->len - 1, "\"\n", 2)))
 				return HTML_MORE;
-			//@ line++
+			//TODO line++
 
 			ffstr_set(out, in->ptr + 1, i);
 			ffstr_shift(in, i + 2);
