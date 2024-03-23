@@ -4,6 +4,7 @@
 /*
 ffui_glib_trash
 ffui_exec
+ffui_openfolder1
 */
 
 #pragma once
@@ -91,5 +92,7 @@ static inline int ffui_exec(const char *arg)
 	ffps_close(ps);
 	return 0;
 }
+
+#define ffui_openfolder1(path)  ffui_exec(path)
 
 #endif
