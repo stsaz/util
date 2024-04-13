@@ -2,7 +2,7 @@
 
 ROOT := ..
 UTIL_DIR := $(ROOT)/util
-FFOS_DIR := $(ROOT)/ffos
+FFSYS_DIR := $(ROOT)/ffsys
 FFBASE_DIR := $(ROOT)/ffbase
 
 include $(FFBASE_DIR)/conf.mk
@@ -14,7 +14,8 @@ OBJ := \
 utiltest: $(OBJ)
 	$(LINK) $+ $(LINKFLAGS) -o $@
 
-CFLAGS := -I$(UTIL_DIR) -I$(FFOS_DIR) -I$(FFBASE_DIR) \
+CFLAGS := -I$(UTIL_DIR) -I$(FFSYS_DIR) -I$(FFBASE_DIR) \
+	-MMD -MP \
 	-Wall -Wextra \
 	-DFFBASE_HAVE_FFERR_STR -DFF_DEBUG -g
 ifeq "$(DEBUG)" "1"
@@ -23,6 +24,8 @@ else
 	CFLAGS += -O3 -fno-strict-aliasing
 endif
 CFLAGS += -std=gnu99
+
+-include $(wildcard *.d)
 
 %.o: $(UTIL_DIR)/data/%.c
 	$(C) $(CFLAGS) $< -o $@

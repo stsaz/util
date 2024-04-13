@@ -1,4 +1,4 @@
-/** fcom: C++ utility functions
+/** C++ utility functions
 2023, Simon Zolin */
 
 #include <ffbase/string.h>

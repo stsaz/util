@@ -16,6 +16,7 @@ System:
 | [sys/kq-tq.h](sys/kq-tq.h)       | Bridge between KQ and TQ |
 | [sys/kq.h](sys/kq.h)             | Process events from kernel queue |
 | [sys/log.h](sys/log.h)           | Logger |
+| [sys/systimer.h](sys/systimer.h) | Disable system sleep timer on Windows and Linux via D-BUS |
 | [sys/thpool.h](sys/thpool.h) + [sys/thpool.c](sys/thpool.c) | Thread pool for offloading the operations that may take a long time to complete. |
 | [sys/unix-shell.h](sys/unix-shell.h)       | UNIX shell utils |
 | [sys/windows-shell.h](sys/windows-shell.h) | Windows shell utils |

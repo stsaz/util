@@ -1,7 +1,12 @@
 /** util: ipaddr.h tester */
 
-#include <FFOS/test.h>
+typedef unsigned long long uint64;
+typedef unsigned int uint;
+
 #include <net/ipaddr.h>
+#include <net/ethernet.h>
+#include <ffsys/test.h>
+
 #define FFSTR(s)  (char*)(s), FFS_LEN(s)
 
 static int test_ip4()
@@ -12,18 +17,18 @@ static int test_ip4()
 
 	sip.ptr = buf;
 
-	x(0 == ffip4_parse(&a4, FFSTR("1.65.192.255")));
+	x(0 == ffip4_parsez(&a4, "1.65.192.255"));
 	x(!memcmp(&a4, FFSTR("\x01\x41\xc0\xff")));
 
-	x(FFS_LEN("1.65.192.255") == ffip4_parse(&a4, FFSTR("1.65.192.255.")));
+	x(FFS_LEN("1.65.192.255") == ffip4_parsez(&a4, "1.65.192.255."));
 	x(!memcmp(&a4, "\x01\x41\xc0\xff", 4));
-	x(FFS_LEN("1.65.192.2") == ffip4_parse(&a4, FFSTR("1.65.192.2/")));
+	x(FFS_LEN("1.65.192.2") == ffip4_parsez(&a4, "1.65.192.2/"));
 	x(!memcmp(&a4, "\x01\x41\xc0\x02", 4));
 
-	x(0 > ffip4_parse(&a4, FFSTR(".1.65.192.255")));
-	x(0 > ffip4_parse(&a4, FFSTR("1.65..192.255")));
-	x(0 > ffip4_parse(&a4, FFSTR("1.65.192.256")));
-	x(0 > ffip4_parse(&a4, FFSTR("1.65,192.255")));
+	x(0 > ffip4_parsez(&a4, ".1.65.192.255"));
+	x(0 > ffip4_parsez(&a4, "1.65..192.255"));
+	x(0 > ffip4_parsez(&a4, "1.65.192.256"));
+	x(0 > ffip4_parsez(&a4, "1.65,192.255"));
 
 	x(24 == ffip4_parse_subnet(&a4, FFSTR("1.65.192.0/24")));
 	x(!memcmp(&a4, "\x01\x41\xc0\x00", 4));
@@ -111,14 +116,14 @@ static int test_ip6()
 		x(0 == memcmp(&a6, ip6, 16));
 	}
 
-	x(0 > ffip6_parse(&a6, FFSTR("1234:")));
-	x(0 > ffip6_parse(&a6, FFSTR("1234::1234:")));
-	x(0 > ffip6_parse(&a6, FFSTR(":1234")));
-	x(0 > ffip6_parse(&a6, FFSTR(":::")));
-	x(0 > ffip6_parse(&a6, FFSTR("::1::")));
-	x(0 > ffip6_parse(&a6, FFSTR("0:12345::")));
-	x(0 > ffip6_parse(&a6, FFSTR("0:123z::")));
-	x(0 > ffip6_parse(&a6, FFSTR("0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:1")));
+	x(0 > ffip6_parsez(&a6, "1234:"));
+	x(0 > ffip6_parsez(&a6, "1234::1234:"));
+	x(0 > ffip6_parsez(&a6, ":1234"));
+	x(0 > ffip6_parsez(&a6, ":::"));
+	x(0 > ffip6_parsez(&a6, "::1::"));
+	x(0 > ffip6_parsez(&a6, "0:12345::"));
+	x(0 > ffip6_parsez(&a6, "0:123z::"));
+	x(0 > ffip6_parsez(&a6, "0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:1"));
 
 	x(128 == ffip6_parse_subnet(&a6, FFSTR("123::abcd:0:0:6789:abcd/128")));
 	x(!memcmp(&a6, "\x01\x23\0\0\0\0\xab\xcd\0\0\0\0\x67\x89\xab\xcd", 16));
@@ -139,17 +144,15 @@ static int test_ip6()
 	return 0;
 }
 
-#if 0
-static void test_eth(void)
+void test_ethernet()
 {
-	ffeth mac;
-	char smac[FFETH_STRLEN];
-	x(0 > ffeth_parse(&mac, "12:34:56:78:ab:XX", FFETH_STRLEN));
-	x(FFETH_STRLEN == ffeth_parse(&mac, "12:34:56:78:ab:CD12345", FFETH_STRLEN + 5));
-	x(FFETH_STRLEN == ffeth_tostr(smac, sizeof(smac), &mac));
-	x(!ffmemcmp(smac, "12:34:56:78:AB:CD", FFETH_STRLEN));
+	ffbyte mac[6];
+	char smac[ETH_STRLEN];
+	x(0 > eth_parse(mac, "12:34:56:78:ab:XX", ETH_STRLEN));
+	x(ETH_STRLEN == eth_parse(mac, "12:34:56:78:ab:CD12345", ETH_STRLEN + 5));
+	x(ETH_STRLEN == eth_str(mac, smac, sizeof(smac)));
+	x(!ffmem_cmp(smac, "12:34:56:78:ab:cd", ETH_STRLEN));
 }
-#endif
 
 void test_ip_split()
 {
@@ -161,7 +164,7 @@ void test_ip_split()
 
 	x(3 == ffip_port_split(FFSTR_Z("127.0.0.1:8080"), ip, &port));
 	x(!memcmp(ip, "\0\0\0\0\0\0\0\0\0\0\xff\xff\x7f\x00\x00\x01", 16));
-	x(port == 8080);
+	xieq(port, 8080);
 
 	x(1 == ffip_port_split(FFSTR_Z("::1"), ip, &port));
 	x(!memcmp(ip, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x01", 16));
@@ -177,11 +180,21 @@ void test_ip_split()
 	x(0 > ffip_port_split(FFSTR_Z(":8080"), ip, &port));
 }
 
+void test_ip_checksum()
+{
+	u_char data[64*1024 - 1];
+	for (uint i = 0;  i < sizeof(data);  i++) {
+		data[i] = i;
+	}
+	xieq(16065, ip_sum(data, sizeof(data)));
+}
+
 int test_ip()
 {
+	test_ethernet();
 	test_ip4();
 	test_ip6();
-	// test_eth();
 	test_ip_split();
+	test_ip_checksum();
 	return 0;
 }

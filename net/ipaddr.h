@@ -269,6 +269,8 @@ static inline int ffip6_parse(ffip6 *a, const char *s, ffsize len)
 	return (i == len) ? 0 : i;
 }
 
+#define ffip6_parsez(ip6, sz)  ffip6_parse(ip6, sz, ffsz_len(sz))
+
 /** Parse IPv6+subnet pair, e.g. "1:2:3::/64"
 Return subnet mask bits;
   <0 on error */
@@ -406,6 +408,7 @@ static inline int ffip_port_split(ffstr s, void *ip6, ffuint *port)
 		ffstr_shift(&s, r+1);
 	}
 
+	*port = 0;
 	if (!ffstr_toint(&s, port, FFS_INT16))
 		return -4; // bad port
 	return (r > 0) | 2;
@@ -543,24 +546,32 @@ static ushort _ip_sum_carry(ushort sum, ushort add)
 	return r + (r < add);
 }
 
-// Add hi-word to low-word with Carry flag: (HI(sum) + LO(sum)) + CF
-static ushort _ip_sum_reduce(ushort sum)
+/** Reduce 48-bit number to 16-bit */
+static uint _ip_sum_reduce(uint64 sum48)
 {
-	sum = (sum >> 16) + (sum & 0xffff);
-	sum = (sum >> 16) + (sum & 0xffff);
-	return sum;
+	uint sum17 = (sum48 >> 32) + ((sum48 >> 16) & 0xffff) + (sum48 & 0xffff); // hi,mid,low -> CF,hi+mid+low
+	return (sum17 >> 16) + (sum17 & 0xffff); // -> CF+(hi+mid+low)
 }
 
+/** Compute Internet checksum */
 static inline ushort ip_sum(const void *buf, uint len)
 {
-	ushort sum = 0;
-	const ushort *n = buf;
-	while (len >= 2) {
-		sum = _ip_sum_carry(sum, *n++);
+	uint64 sum = 0;
+	const uint *p = buf;
+	while (len >= 4) {
+		sum += *p++;
+		len -= 4;
+	}
+
+	if (len >= 2) {
+		sum += *(ushort*)p;
+		p = (void*)((u_char*)p + 2);
 		len -= 2;
 	}
-	if (len > 0)
-		sum = _ip_sum_carry(sum, ((u_char*)n)[0]);
+
+	if (len >= 1)
+		sum += *(u_char*)p;
+
 	return ~_ip_sum_reduce(sum);
 }
 
