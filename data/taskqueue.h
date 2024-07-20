@@ -118,7 +118,7 @@ static inline ffuint fftaskqueue_run(fftaskqueue *tq)
 		fflist_rm(&tq->tasks, it);
 		fflock_unlock(&tq->lk);
 
-		fftask *t = FF_STRUCTPTR(fftask, sib, it);
+		fftask *t = FF_CONTAINER(fftask, sib, it);
 		fftaskqueue_extralog(tq, "task:%p  handler:%p  param:%p", t, t->handler, t->param);
 		t->handler(t->param);
 

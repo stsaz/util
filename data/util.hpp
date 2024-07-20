@@ -9,16 +9,18 @@ struct xxstr : ffstr {
 	xxstr() { ptr = NULL;  len = 0; }
 	xxstr(ffstr s) { ptr = s.ptr;  len = s.len; }
 	xxstr(const char *sz) { ptr = (char*)sz;  len = ffsz_len(sz); }
-	void operator=(const char *sz) { ptr = (char*)sz, len = ffsz_len(sz); }
-	bool equals(xxstr s) const { return ffstr_eq2(this, &s); }
-	void reset() { ptr = NULL;  len = 0; }
-	void free() { ffmem_free(ptr);  ptr = NULL;  len = 0; }
-	xxstr shift(ffsize n) { ffstr_shift(this, n); return *this; }
-	ffssize split_by(char by, xxstr *left, xxstr *right) const { return ffstr_splitby(this, by, left, right); }
-	ffssize split_at(ffssize index, xxstr *left, xxstr *right) const { return ffstr_split(this, index, left, right); }
-	ffssize find_char(char c) const { return ffstr_findchar(this, c); }
-	ffssize find_str(xxstr s) const { return ffstr_findstr(this, &s); }
-	ffssize match_f(const char *fmt, ...) const {
+	void	operator=(const char *sz) { ptr = (char*)sz, len = ffsz_len(sz); }
+	bool	equals(xxstr s) const { return ffstr_eq2(this, &s); }
+	bool	equals_i(const char *sz) const { return ffstr_ieqz(this, sz); }
+	char	at(size_t i) const { FF_ASSERT(i < len); return ptr[i]; }
+	void	reset() { ptr = NULL;  len = 0; }
+	void	free() { ffmem_free(ptr);  ptr = NULL;  len = 0; }
+	xxstr&	shift(ffsize n) { ffstr_shift(this, n); return *this; }
+	ffssize	split_by(char by, xxstr *left, xxstr *right) const { return ffstr_splitby(this, by, left, right); }
+	ffssize	split_at(ffssize index, xxstr *left, xxstr *right) const { return ffstr_split(this, index, left, right); }
+	ffssize	find_char(char c) const { return ffstr_findchar(this, c); }
+	ffssize	find_str(xxstr s) const { return ffstr_findstr(this, &s); }
+	ffssize	match_f(const char *fmt, ...) const {
 		va_list va;
 		va_start(va, fmt);
 		ffssize r = ffstr_matchfmtv(this, fmt, va);
@@ -62,6 +64,10 @@ template<uint N> struct xxstr_buf : ffstr {
 		va_end(va);
 		return *this;
 	}
+	xxstr_buf<N>& add_char(char ch) {
+		ffstr_addchar(this, N - len, ch);
+		return *this;
+	}
 };
 
 template<uint N> struct xxwstr_buf {
@@ -78,10 +84,13 @@ template<uint N> struct xxwstr_buf {
 struct xxvec : ffvec {
 	xxvec() { ffvec_null(this); }
 	xxvec(ffstr s) {
-		ptr = s.ptr, len = s.len, cap = (s.len == 0 && s.ptr != NULL) ? 1 : s.len;
+		ptr = s.ptr, len = s.len, cap = !(s.len == 0 && s.ptr != NULL) ? s.len : 1;
+	}
+	xxvec(const char *sz) {
+		ptr = (char*)sz, len = (ptr != NULL) ? ffsz_len(sz) : 0, cap = (ptr != NULL) ? len + 1 : 0;
 	}
 	xxvec(ffslice s) {
-		ptr = s.ptr, len = s.len, cap = (s.len == 0 && s.ptr != NULL) ? 1 : s.len;
+		ptr = s.ptr, len = s.len, cap = !(s.len == 0 && s.ptr != NULL) ? s.len : 1;
 	}
 	~xxvec() { ffvec_free(this); }
 	void free() { ffvec_free(this); }
@@ -93,7 +102,7 @@ struct xxvec : ffvec {
 	}
 	xxvec& acquire(ffstr s) {
 		ffvec_free(this);
-		ptr = s.ptr, len = s.len, cap = s.len;
+		ptr = s.ptr, len = s.len, cap = !(s.len == 0 && s.ptr != NULL) ? s.len : 1;
 		return *this;
 	}
 	xxvec& copy(ffstr s) {
@@ -112,7 +121,7 @@ struct xxvec : ffvec {
 		va_end(va);
 		return *this;
 	}
-	template<class T> T at(ffsize i) { return *ffslice_itemT(this, i, T); }
+	template<class T> T* at(ffsize i) { return ffslice_itemT(this, i, T); }
 	template<class T> T* alloc(ffsize n) { return ffvec_allocT(this, n, T); }
 	template<class T> T* push() { return ffvec_pushT(this, T); }
 	template<class T> T* push_z() { return ffvec_zpushT(this, T); }
@@ -128,11 +137,21 @@ struct xxvec : ffvec {
 /** Take rvalue */
 template<typename T> T& xxrval(T &&t) { return t; }
 
+struct xxtime : fftime {
+	xxtime() { sec = 0, nsec = 0; }
+	xxtime(const fftime &t) { sec = t.sec, nsec = t.nsec; }
+	xxtime&	since1970() {
+		sec -= FFTIME_1970_SECONDS;
+		return *this;
+	}
+};
+
 struct xxfileinfo {
 	fffileinfo info = {};
 
 	bool	dir() const { return fffile_isdir(fffileinfo_attr(&info)); }
-	fftime	mtime1() const { return fffileinfo_mtime1(&info); }
+	xxtime	mtime() const { return fffileinfo_mtime(&info); }
+	xxtime	mtime1() const { return fffileinfo_mtime1(&info); }
 	uint64	size() const { return fffileinfo_size(&info); }
 	uint	attr() const { return fffileinfo_attr(&info); }
 };
