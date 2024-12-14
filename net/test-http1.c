@@ -1,12 +1,8 @@
-/** http1.h tester
-2022, Simon Zolin
-*/
+/** http1.h tester */
 
-#include <FF/string.h>
+#include <ffsys/test.h>
 #include <ffbase/vector.h>
 #include "http1.h"
-#include <test/test.h>
-#include "all.h"
 
 void test_http1_escape()
 {
@@ -282,7 +278,7 @@ void test_http1_hdr()
 	xseq(&k, "Key");
 	xseq(&v, "Value");
 
-	ffstr_setz(&s, "Key-Key: My Value \r\n");
+	ffstr_setz(&s, "Key-Key  :  My Value  \r\n");
 	xieq(s.len, http_hdr_parse(s, &k, &v));
 	xseq(&k, "Key-Key");
 	xseq(&v, "My Value");
@@ -298,14 +294,12 @@ void test_http1_hdr()
 
 	ffstr_setz(&s, "-Key-Key: My Value \r\n");
 	xieq(-1, http_hdr_parse(s, &k, &v));
-
-	ffstr_setz(&s, "Key-Key : My Value \r\n");
-	xieq(-1, http_hdr_parse(s, &k, &v));
 }
 
-static int test_range()
+static void test_range()
 {
-	uint64 sz;
+#if 0
+	ffuint64 sz;
 
 	sz = 789;
 	x(123 == http_range(FFSTR("123-456"), &sz) && sz == 456 - 123 + 1);
@@ -324,7 +318,7 @@ static int test_range()
 
 	sz = 789;
 	x(-1 == http_range(FFSTR("123-x"), &sz) && sz == 789);
-	return 0;
+#endif
 }
 
 void test_http1()

@@ -9,6 +9,7 @@ include $(FFBASE_DIR)/conf.mk
 
 OBJ := \
 	test.o \
+	test-http1.o \
 	test-ipaddr.o
 
 utiltest: $(OBJ)
@@ -17,7 +18,7 @@ utiltest: $(OBJ)
 CFLAGS := -I$(UTIL_DIR) -I$(FFSYS_DIR) -I$(FFBASE_DIR) \
 	-MMD -MP \
 	-Wall -Wextra \
-	-DFFBASE_HAVE_FFERR_STR -DFF_DEBUG -g
+	-DFF_DEBUG -g
 ifeq "$(DEBUG)" "1"
 	CFLAGS += -O0
 else
