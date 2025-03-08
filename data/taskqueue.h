@@ -1,4 +1,4 @@
-/** ff: task queue: First in, first out.  One reader/deleter, multiple writers.
+/** task queue: First in, first out.  One reader/deleter, multiple writers.
 2013, 2022, Simon Zolin
 */
 
@@ -34,7 +34,7 @@ typedef struct fftask {
 
 struct fftaskqueue_conf_log {
 	ffuint level;
-	void (*func)(void *obj, ffuint flags, const char *ctx, phi_track *trk, const char *fmt, ...);
+	void (*func)(void *obj, ffuint flags, const char *ctx, const char *id, const char *fmt, ...);
 	void *obj;
 	const char *ctx;
 };
@@ -44,7 +44,7 @@ struct fftaskqueue_conf_log {
 	#undef fftaskqueue_extralog
 	#define fftaskqueue_extralog(tq, ...) \
 	do { \
-		if (tq->log.level >= FFTASKQUEUE_LOG_DEBUG) \
+		if (ff_unlikely(tq->log.level >= FFTASKQUEUE_LOG_DEBUG)) \
 			tq->log.func(tq->log.obj, FFTASKQUEUE_LOG_EXTRA, tq->log.ctx, NULL, __VA_ARGS__); \
 	} while (0)
 #endif

@@ -44,7 +44,7 @@ struct zzkevent {
 
 #define zzkq_dbglog(k, ...) \
 do { \
-	if (k->conf.log.level >= ZZKQ_LOG_DEBUG) \
+	if (ff_unlikely(k->conf.log.level >= ZZKQ_LOG_DEBUG)) \
 		k->conf.log.func(k->conf.log.obj, ZZKQ_LOG_DEBUG, k->conf.log.ctx, NULL, __VA_ARGS__); \
 } while (0)
 
@@ -53,14 +53,14 @@ do { \
 	#undef zzkq_extralog
 	#define zzkq_extralog(k, ...) \
 	do { \
-		if (k->conf.log.level >= ZZKQ_LOG_DEBUG) \
+		if (ff_unlikely(k->conf.log.level >= ZZKQ_LOG_DEBUG)) \
 			k->conf.log.func(k->conf.log.obj, ZZKQ_LOG_EXTRA, k->conf.log.ctx, NULL, __VA_ARGS__); \
 	} while (0)
 #endif
 
 struct zzkq_conf_log {
-	ffuint level;
-	void (*func)(void *obj, ffuint flags, const char *ctx, phi_track *trk, const char *fmt, ...);
+	uint level;
+	void (*func)(void *obj, uint flags, const char *ctx, const char *id, const char *fmt, ...);
 	void *obj;
 	const char *ctx;
 };
