@@ -1,9 +1,11 @@
 /** C++ utility functions
 2023, Simon Zolin */
 
+#include <ffsys/path.h>
+#include <ffsys/time.h>
+#include <ffsys/file.h>
 #include <ffbase/string.h>
 #include <ffbase/vector.h>
-#include <ffsys/path.h>
 #include <new>
 
 struct xxstr : ffstr {
@@ -13,12 +15,13 @@ struct xxstr : ffstr {
 	xxstr(const char *s, size_t n) { ptr = (char*)s;  len = n; }
 	void	set(const char *s, size_t n) { ptr = (char*)s;  len = n; }
 	void	operator=(const char *sz) { ptr = (char*)sz, len = ffsz_len(sz); }
-	bool	equals(xxstr s) const { return ffstr_eq2(this, &s); }
-	bool	equals_i(const char *sz) const { return ffstr_ieqz(this, sz); }
-	char	at(size_t i) const { FF_ASSERT(i < len); return ptr[i]; }
 	void	reset() { ptr = NULL;  len = 0; }
-	void	free() { ffmem_free(ptr);  ptr = NULL;  len = 0; }
 	xxstr&	shift(ffsize n) { ffstr_shift(this, n); return *this; }
+	void	free() { ffmem_free(ptr);  ptr = NULL;  len = 0; }
+
+	bool	equals(xxstr s) const { return ffstr_eq2(this, &s); }
+	bool	equals_i(xxstr s) const { return ffstr_ieq(this, s.ptr, s.len); }
+	char	at(size_t i) const { FF_ASSERT(i < len); return ptr[i]; }
 	ffssize	split_by(char by, xxstr *left, xxstr *right) const { return ffstr_splitby(this, by, left, right); }
 	ffssize	split_at(ffssize index, xxstr *left, xxstr *right) const { return ffstr_split(this, index, left, right); }
 	ffssize	find_char(char c) const { return ffstr_findchar(this, c); }
@@ -130,6 +133,14 @@ struct xxvec : ffvec {
 		va_end(va);
 		return *this;
 	}
+	template<class T> xxvec& rm_swap(T *iter, ffsize n) {
+		ffslice_rmswap((ffslice*)this, iter - (T*)ptr, n, sizeof(T));
+		return *this;
+	}
+	template<class T> xxvec& rm_swap(ffsize i, ffsize n) {
+		ffslice_rmswap((ffslice*)this, i, n, sizeof(T));
+		return *this;
+	}
 	template<class T> T* at(ffsize i) { FF_ASSERT(i < len); return ffslice_itemT(this, i, T); }
 	template<class T> T* alloc(ffsize n) { return ffvec_allocT(this, n, T); }
 	template<class T> T* push() { return ffvec_pushT(this, T); }
@@ -147,15 +158,6 @@ struct xxvec : ffvec {
 /** Take rvalue */
 template<typename T> T& xxrval(T &&t) { return t; }
 
-struct xxtime : fftime {
-	xxtime() { sec = 0, nsec = 0; }
-	xxtime(const fftime &t) { sec = t.sec, nsec = t.nsec; }
-	xxtime&	since1970() {
-		sec -= FFTIME_1970_SECONDS;
-		return *this;
-	}
-};
-
 struct xxpath {
 	xxstr data;
 	xxpath(const char *sz) : data(sz) {}
@@ -170,6 +172,18 @@ struct xxpath {
 		ffpath_splitpath(data.ptr, data.len, NULL, &name);
 		return name;
 	}
+};
+
+struct xxtime : fftime {
+	xxtime() { sec = 0, nsec = 0; }
+	xxtime(const fftime &t) { sec = t.sec, nsec = t.nsec; }
+	xxtime(const ffdatetime &dt) { fftime_join1(this, &dt); }
+	xxtime&	since1970() {
+		sec -= FFTIME_1970_SECONDS;
+		return *this;
+	}
+	ffuint64 to_msec() const { return fftime_to_msec(this); }
+	ffuint64 to_usec() const { return fftime_to_usec(this); }
 };
 
 struct xxfileinfo {
