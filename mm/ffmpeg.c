@@ -67,12 +67,22 @@ static int dec_open(ffmpeg_dec *d, int *stream, AVCodecContext **decx, const AVC
 	return 0;
 }
 
-int ffmpeg_dec_open(ffmpeg_dec *d, const char *fn) {
+int ffmpeg_dec_open(ffmpeg_dec *d, ffmpeg_io_read read, ffmpeg_io_seek seek, void *opaque, uint flags) {
 	d->hw_pix_fmt = -1;
 	d->video_stream = d->audio_stream = -1;
 
+	if (!(d->fmt = avformat_alloc_context()))
+		return ERR(d, 0, "avformat_alloc_context()");
+
+	uint cap = 32*1024;
+	uint8_t *buf = av_malloc(cap);
+	if (!(d->fmt->pb = avio_alloc_context(buf, cap, 0, opaque, read, NULL, seek))) {
+		av_free(buf);
+		return ERR(d, 0, "avio_alloc_context()");
+	}
+
 	int r;
-	if ((r = avformat_open_input(&d->fmt, fn, NULL, NULL)) < 0)
+	if ((r = avformat_open_input(&d->fmt, NULL, NULL, NULL)) < 0)
 		return ERR(d, r, "avformat_open_input()");
 
 	if ((r = avformat_find_stream_info(d->fmt, NULL)) < 0)

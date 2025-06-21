@@ -13,6 +13,10 @@ struct ffmpeg_packet {
 typedef struct ffmpeg_frame ffmpeg_frame;
 struct ffmpeg_frame {
 	AVFrame *frame;
+
+#ifdef __cplusplus
+	bool key() const { return !!(frame->flags & AV_FRAME_FLAG_KEY); }
+#endif
 };
 
 #ifdef __cplusplus
@@ -56,13 +60,16 @@ struct ffmpeg_dec {
 	char error_buf[64];
 };
 
+typedef int (*ffmpeg_io_read)(void *opaque, uint8_t *buf, int buf_size);
+typedef int64_t (*ffmpeg_io_seek)(void *opaque, int64_t offset, int whence);
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 void ffmpeg_dec_init(ffmpeg_dec *d);
 void ffmpeg_dec_destroy(ffmpeg_dec *d);
 const char* ffmpeg_dec_error(ffmpeg_dec *d);
-int ffmpeg_dec_open(ffmpeg_dec *d, const char *fn);
+int ffmpeg_dec_open(ffmpeg_dec *d, ffmpeg_io_read read, ffmpeg_io_seek seek, void *opaque, uint flags);
 int ffmpeg_dec_seek(ffmpeg_dec *d, uint64_t pos);
 /**
 Return 0: success; 1: EOF; <0: error */
@@ -84,7 +91,7 @@ struct xxffmpeg_dec : ffmpeg_dec {
 	~xxffmpeg_dec() { ffmpeg_dec_destroy(this); }
 	const char* error() { return ffmpeg_dec_error(this); }
 
-	bool open(const char *fn) { return !ffmpeg_dec_open(this, fn); }
+	bool open(ffmpeg_io_read read, ffmpeg_io_seek seek, void *opaque) { return !ffmpeg_dec_open(this, read, seek, opaque, 0); }
 	bool seek(uint64_t pos) { return ffmpeg_dec_seek(this, pos); }
 	int read(ffmpeg_packet *p) { return ffmpeg_dec_pkt_read(this, p); }
 	bool video_decode(ffmpeg_packet &p, ffmpeg_frame *f) { return !ffmpeg_dec_video_decode(this, &p, f); }
@@ -94,13 +101,14 @@ struct xxffmpeg_dec : ffmpeg_dec {
 	uint64_t duration() const { return fmt->duration / 1000; }
 	uint streams() const { return fmt->nb_streams; }
 
+	bool have_video() const { return !!vcodecx; }
 	bool hwaccel_enable(const char *hwaccel) { return !ffmpeg_dec_hwaccel_enable(this, hwaccel); }
 	int video_width() const { return vcodecx->width; }
 	int video_height() const { return vcodecx->height; }
-	// AV_CODEC_ID_*
-	int video_codec() const { return vcodecx->codec_id; }
+	int video_codec() const { return vcodecx->codec_id; } // AV_CODEC_ID_*
 	double video_time_base() const { return av_q2d(fmt->streams[video_stream]->time_base); }
 
+	bool have_audio() const { return !!acodecx; }
 	int audio_stream_switch() { return ffmpeg_dec_audio_stream_switch(this); }
 	// AV_SAMPLE_FMT_*
 	int audio_format() const { return acodecx->sample_fmt; }

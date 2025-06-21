@@ -46,32 +46,35 @@ struct lxdpbuf {
 
 #define lxdpbuf_shift(b, by)  (b)->off += by
 
+struct _lxdp_offset {
+	uint64 off;
+	void *ptr;
+};
+
 typedef struct lxdpsk lxdpsk;
 struct lxdpsk {
 	struct lxdp *x;
 
-	void *buffer; // memory region for the packet data
+	void *area; // memory region for the packet data
 	struct xsk_umem *umem;
+
+	struct lxdpbuf *ubufs;
+	struct _lxdp_offset *offsets;
+	uint n_free;
+	uint n_total;
 
 	struct xsk_ring_prod fq; // fill-queue: we set the frame offsets where the kernel will write RX packets
 	struct xsk_ring_cons rx; // kernel writes RX packet pointers here
-
-	struct xsk_ring_prod tx; // we write TX packet pointers here
-	struct xsk_ring_cons cq; // completion-queue: kernel writes the frame offsets to the completed TX packets here
-
-	uint64 *offsets;
-	void *buf_ptrs[4096];
-	uint n_free;
-	struct lxdpbuf bufs[4096];
-
-	struct xsk_socket *xsk;
-	int xsk_fd;
-
 	uint64 rx_packets;
 	uint64 rx_bytes;
 
+	struct xsk_ring_prod tx; // we write TX packet pointers here
+	struct xsk_ring_cons cq; // completion-queue: kernel writes the frame offsets to the completed TX packets here
 	uint64 tx_packets;
 	uint64 tx_bytes;
+
+	struct xsk_socket *xsk;
+	int xsk_fd;
 };
 
 #define _LXDP_ERR(x, f, e) \
@@ -176,6 +179,8 @@ static inline void lxdpsk_close(struct lxdpsk *sk)
 	sk->umem = NULL;
 	free(sk->offsets);
 	sk->offsets = NULL;
+	free(sk->ubufs);
+	sk->ubufs = NULL;
 }
 
 static uint _lxdp_fq_reserve(struct lxdpsk *sk)
@@ -189,10 +194,13 @@ static uint _lxdp_fq_reserve(struct lxdpsk *sk)
 	}
 
 	for (uint i = 0;  i < n;  i++) {
+		FF_ASSERT(sk->n_free > 0);
 		sk->n_free--;
-		*xsk_ring_prod__fill_addr(&sk->fq, fq_idx++) = sk->offsets[sk->n_free];
-		sk->offsets[sk->n_free] = ~0ULL;
-		sk->buf_ptrs[sk->n_free] = NULL;
+		*xsk_ring_prod__fill_addr(&sk->fq, fq_idx++) = sk->offsets[sk->n_free].off;
+#ifdef FF_DEBUG
+		sk->offsets[sk->n_free].off = ~0ULL;
+		sk->offsets[sk->n_free].ptr = NULL;
+#endif
 	}
 
 	xsk_ring_prod__submit(&sk->fq, n);
@@ -201,15 +209,20 @@ static uint _lxdp_fq_reserve(struct lxdpsk *sk)
 
 static inline uint _lxdp_cq_reclaim(struct lxdpsk *sk)
 {
+	uint n = xsk_cons_nb_avail(&sk->cq, 256);
+	if (n < 256)
+		return 0;
+
 	uint cq_idx;
-	uint n = xsk_ring_cons__peek(&sk->cq, 128, &cq_idx);
+	n = xsk_ring_cons__peek(&sk->cq, 256, &cq_idx);
 	if (!n)
 		return 0;
 
 	for (uint i = 0;  i < n;  i++) {
-		sk->offsets[sk->n_free] = *xsk_ring_cons__comp_addr(&sk->cq, cq_idx++);
-		uint ibuf = sk->offsets[sk->n_free] / XSK_UMEM__DEFAULT_FRAME_SIZE;
-		sk->buf_ptrs[sk->n_free] = &sk->bufs[ibuf];
+		FF_ASSERT(sk->n_free < sk->n_total);
+		sk->offsets[sk->n_free].off = *xsk_ring_cons__comp_addr(&sk->cq, cq_idx++);
+		uint ibuf = sk->offsets[sk->n_free].off / XSK_UMEM__DEFAULT_FRAME_SIZE;
+		sk->offsets[sk->n_free].ptr = &sk->ubufs[ibuf];
 		sk->n_free++;
 	}
 	xsk_ring_cons__release(&sk->cq, n);
@@ -233,17 +246,19 @@ static inline int lxdpsk_create(struct lxdp *x, struct lxdpsk *sk, const char *i
 
 	int r;
 	size_t cap = n_frames * XSK_UMEM__DEFAULT_FRAME_SIZE;
-	if ((r = posix_memalign(&sk->buffer, getpagesize(), cap))) {
+	if ((r = posix_memalign(&sk->area, getpagesize(), cap))) {
 		_LXDP_ERR(x, "posix_memalign", r);
 		return -1;
 	}
+	if (!(sk->ubufs = malloc(n_frames * sizeof(struct lxdpbuf))))
+		return -1;
 
 	struct xsk_umem_config xuc = {
 		.fill_size = conf->rx_frames,
 		.comp_size = conf->tx_frames,
 		.frame_size = XSK_UMEM__DEFAULT_FRAME_SIZE,
 	};
-	if ((r = xsk_umem__create(&sk->umem, sk->buffer, cap, &sk->fq, &sk->cq, &xuc))) {
+	if ((r = xsk_umem__create(&sk->umem, sk->area, cap, &sk->fq, &sk->cq, &xuc))) {
 		_LXDP_ERR(x, "xsk_umem__create", -r);
 		return -1;
 	}
@@ -260,14 +275,14 @@ static inline int lxdpsk_create(struct lxdp *x, struct lxdpsk *sk, const char *i
 		return -1;
 	}
 
-	if (!(sk->offsets = malloc(n_frames * sizeof(uint64))))
+	if (!(sk->offsets = malloc(n_frames * sizeof(struct _lxdp_offset))))
 		return -1;
-
 	for (uint i = 0;  i < n_frames;  i++) {
-		sk->offsets[i] = i * XSK_UMEM__DEFAULT_FRAME_SIZE;
-		sk->buf_ptrs[i] = &sk->bufs[i];
+		sk->offsets[i].off = i * XSK_UMEM__DEFAULT_FRAME_SIZE;
+		sk->offsets[i].ptr = &sk->ubufs[i];
 	}
 	sk->n_free = n_frames;
+	sk->n_total = n_frames;
 
 	_lxdp_fq_reserve(sk);
 
@@ -303,11 +318,11 @@ static inline int lxdpsk_read(struct lxdpsk *sk, struct lxdpbuf **v, uint n)
 	for (uint i = 0;  i < n;  i++) {
 		const struct xdp_desc *xd = xsk_ring_cons__rx_desc(&sk->rx, rx_idx++);
 		uint ibuf = xd->addr / XSK_UMEM__DEFAULT_FRAME_SIZE;
-		struct lxdpbuf *buf = &sk->bufs[ibuf];
+		struct lxdpbuf *buf = &sk->ubufs[ibuf];
 		ffmem_zero_obj(buf);
 		buf->len = xd->len;
 		total += xd->len;
-		buf->data = (u_char*)sk->buffer + xd->addr;
+		buf->data = (u_char*)sk->area + xd->addr;
 		v[i] = buf;
 	}
 
@@ -334,14 +349,18 @@ static inline int lxdpsk_read(struct lxdpsk *sk, struct lxdpbuf **v, uint n)
 
 static inline uint lxdpsk_buf_alloc(struct lxdpsk *sk, struct lxdpbuf **v, uint n)
 {
+	n = ffmin(n, sk->n_free);
 	for (uint i = 0;  i < n;  i++) {
+		FF_ASSERT(sk->n_free > 0);
 		sk->n_free--;
-		uint64 off = sk->offsets[sk->n_free];
-		struct lxdpbuf *b = sk->buf_ptrs[sk->n_free];
-		sk->buf_ptrs[sk->n_free] = NULL;
-		sk->offsets[sk->n_free] = ~0ULL;
+		struct lxdpbuf *b = sk->offsets[sk->n_free].ptr;
 		ffmem_zero_obj(b);
-		b->data = sk->buffer + off;
+		b->data = sk->area + sk->offsets[sk->n_free].off;
+#ifdef FF_DEBUG
+		sk->offsets[sk->n_free].off = ~0ULL;
+		sk->offsets[sk->n_free].ptr = NULL;
+#endif
+
 		v[i] = b;
 	}
 	return n;
@@ -349,31 +368,37 @@ static inline uint lxdpsk_buf_alloc(struct lxdpsk *sk, struct lxdpbuf **v, uint 
 
 static inline void lxdpsk_buf_release(struct lxdpsk *sk, struct lxdpbuf *buf)
 {
-	sk->offsets[sk->n_free] = buf->data - (u_char*)sk->buffer;
-	sk->buf_ptrs[sk->n_free] = buf;
+	FF_ASSERT(sk->n_free < sk->n_total);
+	sk->offsets[sk->n_free].off = buf->data - (u_char*)sk->area;
+	sk->offsets[sk->n_free].ptr = buf;
 	sk->n_free++;
 }
 
-static inline void lxdpsk_write(struct lxdpsk *sk, struct lxdpbuf *buf)
+static inline uint lxdpsk_write(struct lxdpsk *sk, struct lxdpbuf **v, uint n)
 {
 	uint tx_idx;
-	int r = xsk_ring_prod__reserve(&sk->tx, 1, &tx_idx);
-	if (!r) {
+	n = xsk_ring_prod__reserve(&sk->tx, n, &tx_idx);
+	if (!n) {
 		_lxdp_cq_reclaim(sk);
-		r = xsk_ring_prod__reserve(&sk->tx, 1, &tx_idx);
-		if (!r) {
+		n = xsk_ring_prod__reserve(&sk->tx, n, &tx_idx);
+		if (!n) {
 			FF_ASSERT(0);
-			return;
+			return 0;
 		}
 	}
 
-	struct xdp_desc *xd = xsk_ring_prod__tx_desc(&sk->tx, tx_idx++);
-	xd->addr = buf->data - (u_char*)sk->buffer;
-	xd->len = buf->len;
-	xsk_ring_prod__submit(&sk->tx, 1);
+	uint total = 0;
+	for (uint i = 0;  i < n;  i++) {
+		struct xdp_desc *xd = xsk_ring_prod__tx_desc(&sk->tx, tx_idx++);
+		xd->addr = v[i]->data - (u_char*)sk->area;
+		xd->len = v[i]->len;
+		total += v[i]->len;
+	}
+	xsk_ring_prod__submit(&sk->tx, n);
 
-	sk->tx_bytes += buf->len;
-	sk->tx_packets++;
+	sk->tx_bytes += total;
+	sk->tx_packets += n;
+	return n;
 }
 
 static inline int lxdpsk_flush(struct lxdpsk *sk)

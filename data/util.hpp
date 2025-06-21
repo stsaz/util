@@ -195,3 +195,28 @@ struct xxfileinfo {
 	uint64	size() const { return fffileinfo_size(&info); }
 	uint	attr() const { return fffileinfo_attr(&info); }
 };
+
+struct xxfile {
+	fffd f = FFFILE_NULL;
+
+	~xxfile() { fffile_close(f); }
+	xxfile& open(const char *name, uint flags) {
+		f = fffile_open(name, flags);
+		return *this;
+	}
+	ffssize read(void *buf, ffsize size) { return fffile_read(f, buf, size); }
+	ffint64 seek(ffuint64 pos, int method) { return fffile_seek(f, pos, method); }
+
+	bool null() const { return f == FFFILE_NULL; }
+	xxfileinfo info() const {
+		xxfileinfo fi;
+		fffile_info(f, &fi.info);
+		return fi;
+	}
+
+	static xxfileinfo info(const char *fn) {
+		xxfileinfo fi;
+		fffile_info_path(fn, &fi.info);
+		return fi;
+	}
+};

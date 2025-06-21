@@ -32,7 +32,7 @@ Certificates:
 */
 
 #pragma once
-#include <FFOS/error.h>
+#include <ffsys/error.h>
 #include <ffbase/string.h>
 
 /** Get last error message */
@@ -69,6 +69,9 @@ enum FFSSL_PROTO {
 	FFSSL_PROTO_TLS13 = 8,
 };
 
+struct x509_store_ctx_st; // X509_STORE_CTX
+typedef int (*ffssl_verify_cb)(int preverify_ok, struct x509_store_ctx_st *x509ctx, void *udata);
+
 struct ffssl_ctx_conf {
 	char *cert_file;
 	ffstr cert_data;
@@ -77,6 +80,11 @@ struct ffssl_ctx_conf {
 	char *pkey_file; // PEM file name containing private key
 	ffstr pkey_data;
 	ffssl_key *pkey;
+
+	ffssl_verify_cb	verify_func;
+	uint			verify_depth; // -1: default
+	const char		*CA_file, *CA_path; // NULL: load default CA
+	const char		*client_CA_file;
 
 	char *ciphers; // ciphers separated by ':'
 	char *ciphers_tls13; // TLSv1.3 ciphersuites separated by ':'
@@ -90,11 +98,6 @@ struct ffssl_ctx_conf {
 /** Configurate ffssl_conn context. */
 FF_EXTERN int ffssl_ctx_conf(ffssl_ctx *ctx, const struct ffssl_ctx_conf *conf);
 
-struct x509_store_ctx_st; // X509_STORE_CTX
-typedef int (*ffssl_verify_cb)(int preverify_ok, struct x509_store_ctx_st *x509ctx, void *udata);
-
-FF_EXTERN int ffssl_ctx_ca(ffssl_ctx *ctx, ffssl_verify_cb func, uint verify_depth, const char *fn);
-
 /**
 size:
 	0:  default;
@@ -105,7 +108,7 @@ FF_EXTERN int ffssl_ctx_cache(ffssl_ctx *ctx, int size);
 FF_EXTERN void ffssl_ctx_sess_del(ffssl_ctx *ctx, ffssl_conn *c);
 
 
-enum ffssl_conn_create {
+enum FFSSL_CONN_CREATE {
 	/** Connection type: client (default) or server. */
 	FFSSL_CONNECT = 0,
 	FFSSL_ACCEPT = 1,
@@ -123,7 +126,7 @@ struct ffssl_opt {
 };
 
 /** Create a connection.
-flags: enum ffssl_conn_create
+flags: enum FFSSL_CONN_CREATE
 opt: additional options.
 Return enum FFSSL_E. */
 FF_EXTERN int ffssl_conn_create(ffssl_conn **c, ffssl_ctx *ctx, uint flags, struct ffssl_opt *opt);
@@ -228,8 +231,8 @@ FF_EXTERN void ffssl_cert_info(ffssl_cert *cert, struct ffssl_cert_info *info);
 struct ffssl_cert_newinfo {
 	ffstr subject; // "/K1=[V1]"...
 	int serial;
-	time_t from_time;
-	time_t until_time;
+	ffuint64 from_time; // UNIX timestamp
+	ffuint64 until_time;
 
 	ffssl_key *pkey;
 

@@ -59,8 +59,8 @@ do { \
 #endif
 
 struct zzkq_conf_log {
-	uint level;
-	void (*func)(void *obj, uint flags, const char *ctx, const char *id, const char *fmt, ...);
+	ffuint level;
+	void (*func)(void *obj, ffuint flags, const char *ctx, const char *id, const char *fmt, ...);
 	void *obj;
 	const char *ctx;
 };
@@ -203,7 +203,7 @@ static void _zzkq_kev_call(struct zzkq *k, struct zzkevent *kev, ffkq_event *ev)
 #endif
 
 	zzkq_extralog(k, "%p #%D f:%xu r:%d w:%d"
-		, kev, (kev > k->kevs) ? (ffint64)(kev - k->kevs) : -1LL, flags, kev->rtask.active, kev->wtask.active);
+		, kev, (kev >= k->kevs) ? (ffint64)(kev - k->kevs) : -1LL, flags, kev->rtask.active, kev->wtask.active);
 
 	if ((flags & FFKQ_READ) && kev->rtask.active) {
 		ffkq_task_event_assign(&kev->rtask, ev);
