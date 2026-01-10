@@ -4,6 +4,7 @@
 #pragma once
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libswscale/swscale.h>
 
 typedef struct ffmpeg_packet ffmpeg_packet;
 struct ffmpeg_packet {
@@ -51,9 +52,13 @@ struct ffmpeg_dec {
 	const AVCodec *vcodec, *acodec;
 	int video_stream, audio_stream;
 
+	struct SwsContext *swsx;
+	AVFrame *sws_frame;
+
 	AVBufferRef *hw_device_ctx;
-	enum AVPixelFormat hw_pix_fmt;
+	enum AVPixelFormat hw_pix_fmt, sw_pix_fmt;
 	AVFrame *hw_frame;
+	int reading_frames;
 
 	const char *err_func;
 	int error_code;
@@ -69,13 +74,16 @@ extern "C" {
 void ffmpeg_dec_init(ffmpeg_dec *d);
 void ffmpeg_dec_destroy(ffmpeg_dec *d);
 const char* ffmpeg_dec_error(ffmpeg_dec *d);
-int ffmpeg_dec_open(ffmpeg_dec *d, ffmpeg_io_read read, ffmpeg_io_seek seek, void *opaque, uint flags);
+int ffmpeg_dec_open(ffmpeg_dec *d, ffmpeg_io_read read, ffmpeg_io_seek seek, void *opaque, unsigned flags);
 int ffmpeg_dec_seek(ffmpeg_dec *d, uint64_t pos);
 /**
 Return 0: success; 1: EOF; <0: error */
 int ffmpeg_dec_pkt_read(ffmpeg_dec *d, ffmpeg_packet *p);
+/**
+Return 0: success; 1: packet decoding is complete; <0: error */
 int ffmpeg_dec_video_decode(ffmpeg_dec *d, ffmpeg_packet *p, ffmpeg_frame *f);
 int ffmpeg_dec_audio_decode(ffmpeg_dec *d, ffmpeg_packet *p, ffmpeg_frame *f);
+int ffmpeg_dec_video_convert(ffmpeg_dec *d, ffmpeg_frame *f);
 int ffmpeg_dec_hwaccel_enable(ffmpeg_dec *d, const char *hwaccel);
 int ffmpeg_dec_audio_stream_switch(ffmpeg_dec *d);
 #ifdef __cplusplus
@@ -94,12 +102,13 @@ struct xxffmpeg_dec : ffmpeg_dec {
 	bool open(ffmpeg_io_read read, ffmpeg_io_seek seek, void *opaque) { return !ffmpeg_dec_open(this, read, seek, opaque, 0); }
 	bool seek(uint64_t pos) { return ffmpeg_dec_seek(this, pos); }
 	int read(ffmpeg_packet *p) { return ffmpeg_dec_pkt_read(this, p); }
-	bool video_decode(ffmpeg_packet &p, ffmpeg_frame *f) { return !ffmpeg_dec_video_decode(this, &p, f); }
-	bool audio_decode(ffmpeg_packet &p, ffmpeg_frame *f) { return !ffmpeg_dec_audio_decode(this, &p, f); }
+	int video_decode(ffmpeg_packet &p, ffmpeg_frame *f) { return ffmpeg_dec_video_decode(this, &p, f); }
+	int audio_decode(ffmpeg_packet &p, ffmpeg_frame *f) { return ffmpeg_dec_audio_decode(this, &p, f); }
+	bool video_convert(ffmpeg_frame *f) { return !ffmpeg_dec_video_convert(this, f); }
 
 	// msec
-	uint64_t duration() const { return fmt->duration / 1000; }
-	uint streams() const { return fmt->nb_streams; }
+	uint64_t duration() const { return (fmt->duration != AV_NOPTS_VALUE) ? fmt->duration / 1000 : 0; }
+	unsigned streams() const { return fmt->nb_streams; }
 
 	bool have_video() const { return !!vcodecx; }
 	bool hwaccel_enable(const char *hwaccel) { return !ffmpeg_dec_hwaccel_enable(this, hwaccel); }
@@ -107,6 +116,8 @@ struct xxffmpeg_dec : ffmpeg_dec {
 	int video_height() const { return vcodecx->height; }
 	int video_codec() const { return vcodecx->codec_id; } // AV_CODEC_ID_*
 	double video_time_base() const { return av_q2d(fmt->streams[video_stream]->time_base); }
+
+	bool picture() const { return fmt->duration == AV_NOPTS_VALUE; }
 
 	bool have_audio() const { return !!acodecx; }
 	int audio_stream_switch() { return ffmpeg_dec_audio_stream_switch(this); }

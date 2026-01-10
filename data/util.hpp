@@ -133,6 +133,10 @@ struct xxvec : ffvec {
 		va_end(va);
 		return *this;
 	}
+	template<class T> xxvec& remove(ffsize i, ffsize n) {
+		ffslice_rm((ffslice*)this, i, n, sizeof(T));
+		return *this;
+	}
 	template<class T> xxvec& rm_swap(T *iter, ffsize n) {
 		ffslice_rmswap((ffslice*)this, iter - (T*)ptr, n, sizeof(T));
 		return *this;
@@ -145,6 +149,10 @@ struct xxvec : ffvec {
 	template<class T> T* alloc(ffsize n) { return ffvec_allocT(this, n, T); }
 	template<class T> T* push() { return ffvec_pushT(this, T); }
 	template<class T> T* push_z() { return ffvec_zpushT(this, T); }
+	template<class T> xxvec& insert(const T &item, ffsize pos) {
+		ffvec_insert(this, pos, &item, 1, sizeof(T));
+		return *this;
+	}
 	const xxstr& str() const { return *(xxstr*)this; }
 	const ffslice& slice() const { return *(ffslice*)this; }
 	char* sz() { return (char*)ptr; }

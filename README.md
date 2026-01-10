@@ -10,12 +10,15 @@ System:
 | --- | --- |
 | [sys/aio.h](sys/aio.h)           | File AIO |
 | [sys/crash.h](sys/crash.h)       | Crash handler |
+| [sys/file.h](sys/file.h)         | Utilitary file functions |
 | [sys/kcq.h](sys/kcq.h)           | Process events from kernel call queue; multiple workers |
 | [sys/kq-kcq.h](sys/kq-kcq.h)     | Bridge between KQ and KCQ |
 | [sys/kq-timer.h](sys/kq-timer.h) | KQ timer |
 | [sys/kq-tq.h](sys/kq-tq.h)       | Bridge between KQ and TQ |
 | [sys/kq.h](sys/kq.h)             | Process events from kernel queue |
 | [sys/log.h](sys/log.h)           | Logger |
+| [sys/net.h](sys/net.h)           | Utilitary network functions |
+| [sys/path.h](sys/path.h)         | Utilitary path functions |
 | [sys/systimer.h](sys/systimer.h) | Disable system sleep timer on Windows and Linux via D-BUS |
 | [sys/thpool.h](sys/thpool.h) + [sys/thpool.c](sys/thpool.c) | Thread pool for offloading the operations that may take a long time to complete. |
 | [sys/unix-shell.h](sys/unix-shell.h)       | UNIX shell utils |
@@ -37,6 +40,7 @@ Data:
 | [data/html.h](data/html.h)                    | HTML parser |
 | [data/mbuf.h](data/mbuf.h)                    | Buffer that can be linked with another buffer |
 | [data/range.h](data/range.h)                  | memory region pointer |
+| [data/str.h](data/str.h)                      | Utilitary string functions |
 | [data/stream.h](data/stream.h)                | stream buffer |
 | [data/taskqueue.h](data/taskqueue.h)          | task queue: First in, first out.  One reader/deleter, multiple writers. |
 | [data/util.hpp](data/util.hpp)                | C++ utility functions |
@@ -75,6 +79,14 @@ Network protocols (High layer):
 | [net/tls.h](net/tls.h) + [net/tls.c](net/tls.c) | TLS reader |
 | [net/websocket.h](net/websocket.h) + [net/websocket.c](net/websocket.c) | WebSocket reader/writer |
 
+Multimedia:
+
+| File | Description |
+| --- | --- |
+| [mm/avsync.hpp](mm/avsync.hpp)           | AV synchronization |
+| [mm/ffmpeg.h](mm/ffmpeg.h) + [mm/ffmpeg.c](mm/ffmpeg.c) | ffmpeg wrapper |
+| [mm/SDL.hpp](mm/SDL.hpp)                 | SDL wrapper |
+
 DB:
 
 | File | Description |
@@ -89,6 +101,7 @@ Unsorted:
 | --- | --- |
 | [misc/ico-read.h](misc/ico-read.h)              | .ico reader |
 | [misc/jni-helper.h](misc/jni-helper.h)          | JNI wrapper |
+| [misc/md5sum.h](misc/md5sum.h)                  | Read .md5 file |
 | [misc/pe.h](misc/pe.h) + [misc/pe.c](misc/pe.c) | PE (Windows executable) parser |
 | [misc/pixel-conv.h](misc/pixel-conv.h)          | Convert pixel lines |
 
