@@ -1,6 +1,6 @@
 # util: tests makefile
 
-ROOT := ..
+ROOT := ../..
 UTIL_DIR := $(ROOT)/util
 FFSYS_DIR := $(ROOT)/ffsys
 FFBASE_DIR := $(ROOT)/ffbase

@@ -26,6 +26,7 @@ Data:
 
 | File | Description |
 | --- | --- |
+| [data/ckv.h](data/ckv.h)                      | Compact key-value storage |
 | [data/cmdarg-scheme.h](data/cmdarg-scheme.h)  | command-line arguments parser with scheme |
 | [data/cmdarg.h](data/cmdarg.h)                | command-line arguments parser |
 | [data/conf-args.h](data/conf-args.h)          | ffconf-ffargs bridge |
