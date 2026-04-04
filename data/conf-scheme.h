@@ -12,8 +12,8 @@ ffconf_parse_file
 
 #pragma once
 #include "conf-obj.h"
-#include <FFOS/file.h> // optional
-#include <FFOS/error.h>
+#include <ffsys/file.h> // optional
+#include <ffsys/error.h>
 #include <ffbase/stringz.h>
 
 enum FFCONF_SCHEME_T {
@@ -36,6 +36,7 @@ enum FFCONF_SCHEME_T {
 	FFCONF_FNOTEMPTY = 0x0200,
 	FFCONF_FSIGN = 0x0400,
 	FFCONF_FNOTZERO = 0x0800,
+	FFCONF_FARG = 0x1000,
 
 	FFCONF_TINT64 = _FFCONF_TINT,
 	FFCONF_TINT32 = _FFCONF_TINT | FFCONF_F32BIT,
@@ -258,7 +259,11 @@ static inline int ffconf_scheme_process(ffconf_scheme *cs, int r, ffstr val)
 			return _FFCONF_ERR(cs, "got object, expected something else");
 
 		ffsize nctx = cs->ctxs.len;
-		if (0 != (r2 = uf.func(cs, ctx->obj)))
+		if (flags & FFCONF_FARG)
+			r2 = uf.func_str(cs, ctx->obj, cs->objval);
+		else
+			r2 = uf.func(cs, ctx->obj);
+		if (r2)
 			return -r2; // user error
 		if (nctx + 1 != cs->ctxs.len)
 			return _FFCONF_ERR(cs, "object handler must add a new context");
@@ -509,7 +514,7 @@ end:
 	return r;
 }
 
-#ifdef _FFOS_FILE_H
+#ifdef _FFSYS_FILE_H
 
 /**
 Return 0 on success */
