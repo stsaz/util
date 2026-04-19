@@ -42,11 +42,14 @@ void ffmpeg_frame_unref(ffmpeg_frame *f)
 }
 
 
+void ffmpeg_config(unsigned log_level)
+{
+	av_log_set_level(log_level);
+}
+
+
 void ffmpeg_dec_init(ffmpeg_dec *d)
 {
-#ifndef FF_DEBUG
-	av_log_set_level(AV_LOG_QUIET);
-#endif
 }
 
 void ffmpeg_dec_destroy(ffmpeg_dec *d)
@@ -186,12 +189,13 @@ int ffmpeg_dec_pkt_read(ffmpeg_dec *d, ffmpeg_packet *p)
 
 static enum AVPixelFormat get_format_hw(AVCodecContext *ctx, const enum AVPixelFormat *pix_fmts)
 {
-	const ffmpeg_dec *d = ctx->opaque;
+	ffmpeg_dec *d = ctx->opaque;
 	for (const enum AVPixelFormat *p = pix_fmts;  *p != -1;  p++) {
 		if (*p == d->hw_pix_fmt)
 			return *p;
 	}
 
+	d->error_code = FFMPEG_E_HWDEC;
 	return AV_PIX_FMT_NONE;
 }
 
@@ -269,9 +273,10 @@ int ffmpeg_dec_video_decode(ffmpeg_dec *d, ffmpeg_packet *p, ffmpeg_frame *f)
 {
 	int r;
 
+	d->error_code = 0;
 	if (!(d->reading_frames & 1)
 		&& (r = avcodec_send_packet(d->vcodecx, p->pkt)))
-		return ERR(d, r, "avcodec_send_packet()");
+		return ERRX(d, (d->error_code) ? d->error_code : -1, r, "avcodec_send_packet()");
 	d->reading_frames |= 1;
 
 	if ((r = avcodec_receive_frame(d->vcodecx, f->frame))) {

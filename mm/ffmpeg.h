@@ -12,13 +12,6 @@ struct ffmpeg_packet {
 };
 
 typedef struct ffmpeg_frame ffmpeg_frame;
-struct ffmpeg_frame {
-	AVFrame *frame;
-
-#ifdef __cplusplus
-	bool key() const { return !!(frame->flags & AV_FRAME_FLAG_KEY); }
-#endif
-};
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,6 +25,17 @@ void ffmpeg_frame_unref(ffmpeg_frame *f);
 #ifdef __cplusplus
 }
 #endif
+
+struct ffmpeg_frame {
+	AVFrame *frame;
+
+#ifdef __cplusplus
+	void alloc() { ffmpeg_frame_init(this); }
+	void destroy() { ffmpeg_frame_destroy(this); }
+	void unref() { ffmpeg_frame_unref(this); }
+	bool key() const { return !!(frame->flags & AV_FRAME_FLAG_KEY); }
+#endif
+};
 
 #ifdef __cplusplus
 struct xxffmpeg_packet : ffmpeg_packet {
@@ -68,9 +72,15 @@ struct ffmpeg_dec {
 typedef int (*ffmpeg_io_read)(void *opaque, uint8_t *buf, int buf_size);
 typedef int64_t (*ffmpeg_io_seek)(void *opaque, int64_t offset, int whence);
 
+enum FFMPEG_E {
+	FFMPEG_E_OTHER = -1,
+	FFMPEG_E_HWDEC = -2,
+};
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+void ffmpeg_config(unsigned log_level);
 void ffmpeg_dec_init(ffmpeg_dec *d);
 void ffmpeg_dec_destroy(ffmpeg_dec *d);
 const char* ffmpeg_dec_error(ffmpeg_dec *d);
@@ -102,6 +112,7 @@ struct xxffmpeg_dec : ffmpeg_dec {
 	bool open(ffmpeg_io_read read, ffmpeg_io_seek seek, void *opaque) { return !ffmpeg_dec_open(this, read, seek, opaque, 0); }
 	bool seek(uint64_t pos) { return ffmpeg_dec_seek(this, pos); }
 	int read(ffmpeg_packet *p) { return ffmpeg_dec_pkt_read(this, p); }
+	const char* format_name() const { return fmt->iformat->name; }
 	int video_decode(ffmpeg_packet &p, ffmpeg_frame *f) { return ffmpeg_dec_video_decode(this, &p, f); }
 	int audio_decode(ffmpeg_packet &p, ffmpeg_frame *f) { return ffmpeg_dec_audio_decode(this, &p, f); }
 	bool video_convert(ffmpeg_frame *f) { return !ffmpeg_dec_video_convert(this, f); }
@@ -115,11 +126,13 @@ struct xxffmpeg_dec : ffmpeg_dec {
 	int video_width() const { return vcodecx->width; }
 	int video_height() const { return vcodecx->height; }
 	int video_codec() const { return vcodecx->codec_id; } // AV_CODEC_ID_*
+	const char* video_codec_name() const { return vcodec->name; }
 	double video_time_base() const { return av_q2d(fmt->streams[video_stream]->time_base); }
 
 	bool picture() const { return fmt->duration == AV_NOPTS_VALUE; }
 
 	bool have_audio() const { return !!acodecx; }
+	const char* audio_codec_name() const { return acodec->name; }
 	int audio_stream_switch() { return ffmpeg_dec_audio_stream_switch(this); }
 	// AV_SAMPLE_FMT_*
 	int audio_format() const { return acodecx->sample_fmt; }

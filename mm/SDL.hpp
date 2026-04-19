@@ -5,6 +5,14 @@
 #include <SDL3/SDL.h>
 #undef main // Prevent SDL from overriding main()
 
+#define LOG(fmt, ...)
+#ifdef FF_DEBUG
+	#include <ffsys/std.h>
+	#undef LOG
+	#define LOG(fmt, ...) \
+		fflog(fmt, ##__VA_ARGS__)
+#endif
+
 static inline int sdl_init(unsigned init)
 {
 	if (!init) {
@@ -45,14 +53,42 @@ struct sdlctx {
 
 static inline void sdl_destroy(struct sdlctx *c)
 {
-	SDL_DestroyRenderer(c->renderer);
 	SDL_DestroyWindow(c->window);
+	SDL_DestroyRenderer(c->renderer);
 	SDL_DestroyTexture(c->texture);
+}
+
+static inline void sdl_screen_center(unsigned *x, unsigned *y, unsigned w, unsigned h)
+{
+	SDL_DisplayID display = SDL_GetPrimaryDisplay();
+	SDL_Rect r;
+	SDL_GetDisplayBounds(display, &r);
+	*x = (r.w > w) ? (r.w - w) / 2 : 0;
+	*y = (r.h > h) ? (r.h - h) / 2 : 0;
+}
+
+static inline unsigned sdl_screen_clamp(unsigned *w, unsigned *h, unsigned flags)
+{
+	SDL_DisplayID display = SDL_GetPrimaryDisplay();
+	SDL_Rect r;
+	SDL_GetDisplayUsableBounds(display, &r);
+
+	double z = 1, zh = 1;
+	if (*w > r.w)
+		z = (double)r.w / *w;
+	if (*h > r.h)
+		zh = (double)r.h / *h;
+	if (z > zh)
+		z = zh;
+	*w = z * *w;
+	*h = z * *h;
+	return z * 100;
 }
 
 struct sdl_conf {
 	unsigned width, height;
 	const char *title;
+	const char *renderer;
 };
 
 static inline int sdl_open(struct sdlctx *c, struct sdl_conf *conf)
@@ -61,8 +97,9 @@ static inline int sdl_open(struct sdlctx *c, struct sdl_conf *conf)
 	if (!(c->window = SDL_CreateWindow(conf->title, conf->width, conf->height, f)))
 		return ERR(c, "SDL_CreateWindow()");
 
-	if (!(c->renderer = SDL_CreateRenderer(c->window, NULL)))
+	if (!(c->renderer = SDL_CreateRenderer(c->window, conf->renderer)))
 		return ERR(c, "SDL_CreateRenderer()");
+	LOG("SDL renderer: %s", SDL_GetRendererName(c->renderer));
 
 	SDL_FRect r = {
 		.x = 0,
@@ -100,10 +137,11 @@ static inline int sdl_display(struct sdlctx *c, const struct sdl_frame *frame, S
 	SDL_SetRenderDrawColor(c->renderer, 0, 0, 0, 255);
 	SDL_RenderClear(c->renderer);
 
-	if (!c->texture
-		|| frame->width != c->texture->w
-		|| frame->height != c->texture->h
-		|| format != c->texture->format) {
+	if (!(c->texture
+		&& frame->width == c->texture->w
+		&& frame->height == c->texture->h
+		&& format == c->texture->format)) {
+		SDL_DestroyTexture(c->texture);
 		if (!(c->texture = SDL_CreateTexture(c->renderer, format, SDL_TEXTUREACCESS_STREAMING, frame->width, frame->height)))
 			return ERR(c, "SDL_CreateTexture()");
 		if (!SDL_SetTextureBlendMode(c->texture, blendmode))
@@ -113,7 +151,7 @@ static inline int sdl_display(struct sdlctx *c, const struct sdl_frame *frame, S
 	if (_sdl_texture_convert(c, format, frame))
 		return -1;
 
-	SDL_RenderTextureRotated(c->renderer, c->texture, NULL, &c->rect, 0, NULL, SDL_FLIP_NONE);
+	SDL_RenderTexture(c->renderer, c->texture, NULL, &c->rect);
 	SDL_RenderPresent(c->renderer);
 	return 0;
 }
@@ -151,6 +189,13 @@ struct xxsdl : sdlctx {
 	void fullscreen(bool enable) {
 		SDL_SetWindowFullscreen(window, enable);
 		_fullscreen = enable;
+	}
+	void fullscreen_size(unsigned *w, unsigned *h) const {
+		SDL_DisplayID display = SDL_GetPrimaryDisplay();
+		SDL_Rect r;
+		SDL_GetDisplayBounds(display, &r);
+		*w = r.w;
+		*h = r.h;
 	}
 
 	bool display(const struct sdl_frame *frame, SDL_PixelFormat format, SDL_BlendMode blendmode) { return !sdl_display(this, frame, format, blendmode); }

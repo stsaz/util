@@ -1,0 +1,66 @@
+From 0b1816e0b63aff57e8f6981bde00b2b3c3a64c2e Mon Sep 17 00:00:00 2001
+From: Simon Zolin <4729655+stsaz@users.noreply.github.com>
+Date: Thu, 9 Feb 2023 20:05:41 +0300
+Subject: [PATCH] disable unused code
+
+---
+ src/libFLAC/format.c         | 1 +
+ src/libFLAC/stream_decoder.c | 2 ++
+ src/libFLAC/stream_encoder.c | 2 ++
+ 3 files changed, 5 insertions(+)
+
+diff --git a/src/libFLAC/format.c b/src/libFLAC/format.c
+index 634a15b..211e156 100644
+--- a/src/libFLAC/format.c
++++ b/src/libFLAC/format.c
+@@ -280,6 +280,7 @@ static int seekpoint_compare_(const FLAC__StreamMetadata_SeekPoint *l, const FLA
+ /* @@@@ add to unit tests; it is already indirectly tested by the metadata_object tests */
+ FLAC_API uint32_t FLAC__format_seektable_sort(FLAC__StreamMetadata_SeekTable *seek_table)
+ {
++	return ~0U;
+ 	uint32_t i, j;
+ 	FLAC__bool first;
+ 
+diff --git a/src/libFLAC/stream_decoder.c b/src/libFLAC/stream_decoder.c
+index 72f1226..3a34fc2 100644
+--- a/src/libFLAC/stream_decoder.c
++++ b/src/libFLAC/stream_decoder.c
+@@ -499,6 +499,7 @@ static FLAC__StreamDecoderInitStatus init_FILE_internal_(
+ 	FLAC__bool is_ogg
+ )
+ {
++	return ~0U;
+ 	FLAC__ASSERT(0 != decoder);
+ 	FLAC__ASSERT(0 != file);
+ 
+@@ -567,6 +568,7 @@ static FLAC__StreamDecoderInitStatus init_file_internal_(
+ 	FLAC__bool is_ogg
+ )
+ {
++	return ~0U;
+ 	FILE *file;
+ 
+ 	FLAC__ASSERT(0 != decoder);
+diff --git a/src/libFLAC/stream_encoder.c b/src/libFLAC/stream_encoder.c
+index 0fab2ce..7ee32da 100644
+--- a/src/libFLAC/stream_encoder.c
++++ b/src/libFLAC/stream_encoder.c
+@@ -1506,6 +1506,7 @@ static FLAC__StreamEncoderInitStatus init_FILE_internal_(
+ 	FLAC__bool is_ogg
+ )
+ {
++	return ~0U;
+ 	FLAC__StreamEncoderInitStatus init_status;
+ 
+ 	FLAC__ASSERT(0 != encoder);
+@@ -1596,6 +1597,7 @@ static FLAC__StreamEncoderInitStatus init_file_internal_(
+ 	FLAC__bool is_ogg
+ )
+ {
++	return ~0U;
+ 	FILE *file;
+ 
+ 	FLAC__ASSERT(0 != encoder);
+-- 
+2.44.0
+

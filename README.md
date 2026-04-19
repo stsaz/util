@@ -76,6 +76,7 @@ Network protocols (High layer):
 | [net/http1-status.h](net/http1-status.h) | HTTP status codes and messages |
 | [net/http1.h](net/http1.h)               | Read/write HTTP/1 data |
 | [net/socks.h](net/socks.h)               | SOCKS4 |
+| [net/socks5.h](net/socks5.h)             | SOCKS5 |
 | [net/tls.h](net/tls.h) + [net/tls.c](net/tls.c) | TLS reader |
 | [net/websocket.h](net/websocket.h) + [net/websocket.c](net/websocket.c) | WebSocket reader/writer |
 

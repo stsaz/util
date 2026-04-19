@@ -1,0 +1,47 @@
+From e58aa150e193ef865f8ed18d58f43a64a81fefcf Mon Sep 17 00:00:00 2001
+From: Simon Zolin <4729655+stsaz@users.noreply.github.com>
+Date: Tue, 11 Apr 2017 19:33:09 +0300
+Subject: [PATCH] + x86 filter for xz-5.2.4
+
+---
+ src/liblzma/simple/x86.c | 21 ++++++++++++++++++++-
+ 1 file changed, 20 insertions(+), 1 deletion(-)
+
+diff --git a/src/liblzma/simple/x86.c b/src/liblzma/simple/x86.c
+index 3b2b4f8..30c51da 100644
+--- a/src/liblzma/simple/x86.c
++++ b/src/liblzma/simple/x86.c
+@@ -20,6 +20,7 @@
+ typedef struct {
+ 	uint32_t prev_mask;
+ 	uint32_t prev_pos;
++	uint32_t now_pos;
+ } lzma_simple_x86;
+
+
+@@ -154,3 +154,22 @@ lzma_simple_x86_decoder_init(lzma_next_coder *next,
+ {
+ 	return x86_coder_init(next, allocator, filters, false);
+ }
++
++
++
++#include <lzma-ff.h>
++
++static size_t lzma_x86_decode(void *ctx, char *buf, size_t size)
++{
++	lzma_simple_x86 *c = ctx;
++	size_t n = x86_code(c, c->now_pos, 0, (void*)buf, size);
++	c->now_pos += n;
++	return n;
++}
++
++const lzma_coder_ctx lzma_x86_ctx = {
++	.method = LZMA_FILTER_X86,
++	.ctxsize = sizeof(lzma_simple_x86),
++	.max_unprocessed = 5,
++	.simple_decoder = &lzma_x86_decode,
++};
+--
+2.7.4
+

@@ -1,0 +1,45 @@
+From e288abd25b44657a4e9c7fa4d08986236cd7c7e8 Mon Sep 17 00:00:00 2001
+From: Simon Zolin <4729655+stsaz@users.noreply.github.com>
+Date: Sat, 6 Jan 2024 00:00:00 +0300
+Subject: [PATCH] disable unused code
+
+---
+ src/libmpg123/readers.c | 22 +++++++++++++++++++++-
+ 1 file changed, 21 insertions(+), 1 deletion(-)
+
+diff --git a/src/libmpg123/readers.c b/src/libmpg123/readers.c
+index 0cf4aae..c8bd78b 100644
+--- a/src/libmpg123/readers.c
++++ b/src/libmpg123/readers.c
+@@ -922,7 +922,27 @@ static void bad_rewind(mpg123_handle *mh){}
+ #define READER_FEED       2
+ #define READER_BUF_STREAM 3
+ #define READER_BUF_ICY_STREAM 4
+-static struct reader readers[] =
++
++static struct reader readers[] = {
++	{NULL}, {NULL},
++	{ /* READER_FEED */
++		feed_init,
++		stream_close,
++		feed_read,
++		generic_head_read,
++		generic_head_shift,
++		feed_skip_bytes,
++		generic_read_frame_body,
++		feed_back_bytes,
++		feed_seek_frame,
++		generic_tell,
++		stream_rewind,
++		buffered_forget
++	},
++	{NULL}, {NULL},
++};
++
++static struct reader _readers[] =
+ {
+ 	{ /* READER_STREAM */
+ 		stream_init,
+-- 
+2.40.0
+
